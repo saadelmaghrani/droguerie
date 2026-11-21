@@ -63,7 +63,10 @@ export async function replaceProductImage(imageId: string, image: ProcessedImage
     where: { id: imageId },
     data: { storageKey: image.key, width: image.width, height: image.height, source: "ORIGINAL", originalStorageKey: null },
   });
-  await deleteImageFiles(current.storageKey, "product");
+  // Photo fond studio remplacée : sa version originale conservée n'a plus d'usage non plus.
+  await Promise.all(
+    [current.storageKey, current.originalStorageKey].filter((k): k is string => Boolean(k)).map((k) => deleteImageFiles(k, "product")),
+  );
   return { ok: true, message: "Photo remplacée." };
 }
 
@@ -82,7 +85,9 @@ export async function deleteProductImage(imageId: string): Promise<ImageServiceR
       await tx.productImage.update({ where: { id: next.id }, data: { position: next.position - 1 } });
     }
   });
-  await deleteImageFiles(image.storageKey, "product");
+  await Promise.all(
+    [image.storageKey, image.originalStorageKey].filter((k): k is string => Boolean(k)).map((k) => deleteImageFiles(k, "product")),
+  );
   return {
     ok: true,
     message: image.position === 0 ? "Photo supprimée. La suivante devient la photo principale." : "Photo supprimée.",

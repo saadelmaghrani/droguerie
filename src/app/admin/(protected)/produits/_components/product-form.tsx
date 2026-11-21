@@ -237,7 +237,7 @@ export function ProductForm({
             </CardHeader>
             <CardContent>
               {product ? (
-                <ProductImages productId={product.id} productName={product.name} images={product.images} />
+                <ProductImages productId={product.id} productName={product.name} images={product.images} aiConfigured={aiConfigured} />
               ) : (
                 <PendingImages images={pendingImages} onChange={setPendingImages} disabled={pending || uploadProgress !== null} />
               )}

@@ -13,7 +13,9 @@ export type AiErrorKind =
   | "model" // modèle inconnu ou non autorisé (OPENAI_MODEL)
   | "unavailable" // 5xx : OpenAI indisponible
   | "network" // le serveur n'arrive pas à joindre OpenAI
-  | "bad_response"; // réponse inutilisable (refus, coupée, JSON invalide)
+  | "bad_response" // réponse inutilisable (refus, coupée, JSON invalide)
+  | "cutout_unavailable" // modèle de détourage non installé sur le serveur
+  | "no_subject"; // aucun produit net détecté sur la photo
 
 const BILLING_URL = "https://platform.openai.com/settings/organization/billing";
 const KEYS_URL = "https://platform.openai.com/api-keys";
@@ -30,6 +32,8 @@ export const AI_MESSAGES: Record<AiErrorKind, string> = {
   unavailable: "OpenAI est momentanément indisponible. Réessayez dans quelques minutes.",
   network: "Impossible de joindre OpenAI : vérifiez la connexion internet du serveur, puis réessayez.",
   bad_response: "La réponse de l'IA est inutilisable. Réessayez ; si cela persiste, ajoutez une photo plus nette ou plus d'informations.",
+  cutout_unavailable: "Le détourage n'est pas installé sur le serveur : lancez « npm run ai:model » (téléchargement unique d'environ 170 Mo).",
+  no_subject: "Aucun produit net n'a été détecté sur la photo principale. Essayez avec une photo où le produit est bien visible et centré.",
 };
 
 /** L'administrateur doit agir sur son compte OpenAI (bandeau d'alerte, pas une simple erreur passagère). */

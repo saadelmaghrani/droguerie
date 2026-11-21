@@ -24,6 +24,7 @@ cp .env.example .env        # puis remplir les valeurs (mots de passe, compte ad
 npm run db:up               # démarre PostgreSQL (Docker)
 npx prisma migrate deploy   # crée les tables
 npm run db:seed             # paramètres, compte admin, données de démo si SEED_DEMO_DATA=true
+npm run ai:model            # modèle de détourage « fond studio » (≈ 170 Mo, une seule fois)
 npm run dev                 # http://localhost:3000
 ```
 
@@ -42,6 +43,7 @@ Espace administrateur : http://localhost:3000/admin (identifiants : `ADMIN_EMAIL
 | `npm run db:migrate -- --name <nom>` | Nouvelle migration après modification du schéma |
 | `npm run db:seed` | Données initiales (relançable sans doublons) |
 | `npm run db:studio` | Explorer la base dans le navigateur |
+| `npm run ai:model` | Télécharge le modèle de détourage (fond studio), empreinte vérifiée |
 
 ## Dépannage
 
@@ -68,7 +70,7 @@ Arrêter toujours le serveur avec `Ctrl + C` plutôt que de fermer brutalement l
 | [`docs/products.md`](docs/products.md) | Produits : recherche, filtres, règles de la fiche |
 | [`docs/images.md`](docs/images.md) | Images : traitement, tailles, sécurité, stockage |
 | [`docs/settings.md`](docs/settings.md) | Paramètres du magasin : champs, sécurité des liens |
-| [`docs/ai.md`](docs/ai.md) | IA (OpenAI) : compte du client, clé, erreurs, validation par l'admin |
+| [`docs/ai.md`](docs/ai.md) | IA : textes (OpenAI), photo fond studio (détourage local / OpenAI), erreurs, validation |
 
 ## Variables d'environnement
 

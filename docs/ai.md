@@ -17,6 +17,8 @@ publié automatiquement**.
 |---|---|
 | `OPENAI_API_KEY` | Clé secrète. Vide = IA désactivée (bouton remplacé par une explication). Jamais préfixée `NEXT_PUBLIC_` |
 | `OPENAI_MODEL` | Modèle (défaut `gpt-6.2-sol`, lit les photos). Liste : https://developers.openai.com/api/docs/models |
+| `OPENAI_IMAGE_MODEL` | Modèle de retouche d'image (défaut `gpt-image-2.5-sunburst`) |
+| `MODELS_DIR` | Dossier du modèle de détourage (défaut `./storage/models`) |
 | `OPENAI_BASE_URL` | Facultatif, tests uniquement (faux serveur OpenAI) |
 
 ## Sécurité
@@ -67,6 +69,34 @@ du mois, dernier problème de compte, et un bouton **Tester la connexion** (requ
 | `src/app/admin/(protected)/produits/_components/ai-assistant.tsx` | Assistant dans la fiche produit |
 | `src/app/admin/(protected)/parametres/_components/ai-*.tsx` | Encadré des Paramètres |
 
-## À venir
+## Photo fond studio (photo principale)
 
-Photo professionnelle (détourage + fond studio, sans modifier les pixels du produit) : à décider.
+Fiche produit › photo principale › **Fond studio**. Deux méthodes au choix :
+
+| | Détourage fidèle (recommandé) | Version OpenAI |
+|---|---|---|
+| Principe | Modèle ISNet sur **notre serveur** : le fond est retiré, le produit posé sur un fond uniforme `#F4F4F5` avec une ombre douce | OpenAI (`images.edit`) régénère la photo sur fond studio, avec une consigne stricte |
+| Produit | **Pixels identiques** à l'original : copiés à l'échelle 1:1, jamais redessinés (vérifié par un test automatique, 0 pixel différent) | **Redessiné** : marque, logo ou texte peuvent être altérés malgré la consigne |
+| Coût | Gratuit (≈ 1 à 4 s de calcul) | Payé par le compte OpenAI du client (coût estimé enregistré) |
+| Limites | Bords imparfaits possibles (objets transparents, fins) | Avertissement affiché : comparer avant d'utiliser |
+
+Validation **obligatoire** :
+1. La variante est créée **à côté** de la photo (fichiers + `ai_generations` PENDING) : la fiche ne change pas.
+2. Fenêtre **avant / après** : « **Utiliser** » ou « **Garder l'originale** ». Fermer la fenêtre = garder l'originale.
+3. « Utiliser » : la photo affiche la variante (`source = AI_STUDIO`), l'**originale est conservée**
+   (`original_storage_key`). Bouton **Originale** sur la photo pour y revenir à tout moment.
+4. Une nouvelle variante repart toujours de la photo **d'origine** (jamais d'une variante).
+5. Variantes jamais validées (onglet fermé) : fichiers supprimés après 24 h.
+
+Installation du modèle (une fois par machine, et sur le serveur de production) : `npm run ai:model`
+→ `storage/models/isnet-general-use.onnx` (≈ 170 Mo, licence Apache-2.0, MD5 vérifié). Exécuté par
+`onnxruntime-node` (MIT). Sans le modèle, la méthode affiche « Le détourage n'est pas installé… ».
+Paquet `@imgly/background-removal-node` écarté : licence AGPL, incompatible avec un site commercial fermé.
+
+| Fichier | Rôle |
+|---|---|
+| `src/server/ai/studio-cutout.ts` | Détourage ISNet + pose sur fond studio (testé : pixels identiques, photo vide refusée) |
+| `src/server/ai/studio-openai.ts` | Variante OpenAI : consigne stricte, modèle `OPENAI_IMAGE_MODEL` |
+| `src/server/ai/studio-service.ts` | Variante en attente, Utiliser / Garder l'originale / Revenir à l'originale |
+| `src/server/ai/studio-actions.ts` | Actions serveur (`requireAdmin()` en premier) |
+| `src/app/admin/(protected)/produits/_components/studio-dialog.tsx` | Fenêtre choix → avant/après → décision |

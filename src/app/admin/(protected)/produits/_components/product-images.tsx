@@ -4,7 +4,7 @@
 import Image from "next/image";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { ArrowLeft, ArrowRight, Loader2, RefreshCw, Star, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Loader2, RefreshCw, Star, Trash2, Undo2, Wand2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -24,14 +24,36 @@ import {
   setPrimaryProductImage,
   uploadProductImage,
 } from "@/server/products/image-actions";
+import { restoreOriginalImageAction } from "@/server/ai/studio-actions";
 import { ImageDropzone, useImagePicker } from "../../_components/image-dropzone";
+import { StudioDialog } from "./studio-dialog";
 
-export type ProductImage = { id: string; position: number; storageKey: string; width: number; height: number };
+export type ProductImage = {
+  id: string;
+  position: number;
+  storageKey: string;
+  width: number;
+  height: number;
+  source?: "ORIGINAL" | "ENHANCED" | "AI_STUDIO";
+  /** Renseignée quand la photo affichée est une version fond studio : l'originale est conservée. */
+  originalStorageKey?: string | null;
+};
 type Result = { ok: boolean; message: string };
 
 const SLOTS = [0, 1, 2] as const;
 
-export function ProductImages({ productId, productName, images }: { productId: string; productName: string; images: ProductImage[] }) {
+export function ProductImages({
+  productId,
+  productName,
+  images,
+  aiConfigured = false,
+}: {
+  productId: string;
+  productName: string;
+  images: ProductImage[];
+  aiConfigured?: boolean;
+}) {
+  const [studioFor, setStudioFor] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [busy, setBusy] = useState<string | null>(null); // "upload" ou id de la photo
   const [toDelete, setToDelete] = useState<ProductImage | null>(null);
@@ -80,6 +102,8 @@ export function ProductImages({ productId, productName, images }: { productId: s
                   onPrimary={() => run(image.id, () => setPrimaryProductImage(image.id))}
                   onMove={(direction) => run(image.id, () => moveProductImage(image.id, direction))}
                   onDelete={() => setToDelete(image)}
+                  onStudio={() => setStudioFor(image.id)}
+                  onRestore={() => run(image.id, () => restoreOriginalImageAction(image.id))}
                   canMoveLeft={position > 0}
                   canMoveRight={byPosition.has(position + 1)}
                 />
@@ -102,6 +126,16 @@ export function ProductImages({ productId, productName, images }: { productId: s
       <p className="text-xs text-muted-foreground">
         La photo principale apparaît dans le catalogue. Les métadonnées (dont la position GPS) sont supprimées à l&apos;envoi.
       </p>
+
+      {studioFor && (
+        <StudioDialog
+          open
+          onOpenChange={(open) => !open && setStudioFor(null)}
+          imageId={studioFor}
+          productName={productName}
+          aiConfigured={aiConfigured}
+        />
+      )}
 
       <AlertDialog open={toDelete !== null} onOpenChange={(open) => !open && !isPending && setToDelete(null)}>
         <AlertDialogContent>
@@ -141,6 +175,8 @@ function FilledSlot({
   onPrimary,
   onMove,
   onDelete,
+  onStudio,
+  onRestore,
   canMoveLeft,
   canMoveRight,
 }: {
@@ -152,6 +188,8 @@ function FilledSlot({
   onPrimary: () => void;
   onMove: (direction: "left" | "right") => void;
   onDelete: () => void;
+  onStudio: () => void;
+  onRestore: () => void;
   canMoveLeft: boolean;
   canMoveRight: boolean;
 }) {
@@ -173,6 +211,12 @@ function FilledSlot({
           <Badge className="absolute top-2 left-2">
             <Star className="size-3" aria-hidden />
             Principale
+          </Badge>
+        )}
+        {image.originalStorageKey && (
+          <Badge variant="secondary" className="absolute right-2 bottom-2">
+            <Wand2 className="size-3" aria-hidden />
+            Fond studio
           </Badge>
         )}
         {busy && (
@@ -201,6 +245,22 @@ function FilledSlot({
           <Trash2 aria-hidden />
         </Button>
       </div>
+      {(image.position === 0 || image.originalStorageKey) && (
+        <div className="flex flex-wrap gap-1">
+          {image.position === 0 && (
+            <Button type="button" variant="outline" size="sm" disabled={disabled} onClick={onStudio} className="flex-1">
+              <Wand2 aria-hidden />
+              Fond studio
+            </Button>
+          )}
+          {image.originalStorageKey && (
+            <Button type="button" variant="ghost" size="sm" disabled={disabled} onClick={onRestore} title="Revenir à la photo d'origine">
+              <Undo2 aria-hidden />
+              Originale
+            </Button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

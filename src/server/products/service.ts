@@ -155,7 +155,10 @@ export async function getProduct(id: string) {
     where: { id },
     include: {
       _count: { select: { images: true } },
-      images: { orderBy: { position: "asc" }, select: { id: true, position: true, storageKey: true, width: true, height: true } },
+      images: {
+        orderBy: { position: "asc" },
+        select: { id: true, position: true, storageKey: true, width: true, height: true, source: true, originalStorageKey: true },
+      },
     },
   });
 }
