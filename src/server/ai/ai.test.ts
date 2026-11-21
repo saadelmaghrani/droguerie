@@ -1,7 +1,7 @@
 import { APIConnectionError, APIError } from "openai";
 import { describe, expect, it } from "vitest";
 import { AiError, classifyOpenAiError, kindFromErrorFields } from "./errors";
-import { buildProductTextPrompt, estimateCostUsd, parseProductTextOutput } from "./product-text-prompt";
+import { buildProductTextPrompt, cleanNotes, estimateCostUsd, NOTES_MAX_LENGTH, parseProductTextOutput } from "./product-text-prompt";
 
 const apiError = (status: number, code?: string, type?: string) =>
   APIError.generate(status, { error: { code, type, message: "détail" } }, "détail", new Headers());
@@ -46,6 +46,17 @@ describe("consigne", () => {
     expect(prompt).toContain("- Marque : Plastor");
     expect(prompt).not.toContain("Référence");
     expect(prompt).toContain("photo du produit");
+  });
+  it("ajoute les indications du magasin, délimitées", () => {
+    const prompt = buildProductTextPrompt({ ...hints, notes: "  Plastique alimentaire,\tanse renforcée " }, true);
+    expect(prompt).toContain('Indications du magasin (faits fiables à utiliser en priorité) :\n"""Plastique alimentaire, anse renforcée"""');
+  });
+  it("sans indications : aucun bloc ajouté", () => {
+    expect(buildProductTextPrompt({ ...hints, notes: "   " }, true)).not.toContain("Indications du magasin");
+  });
+  it("nettoie les indications (contrôles, délimiteurs, longueur)", () => {
+    expect(cleanNotes('a\u0007b """c"""')).toBe('a b ""c""');
+    expect(cleanNotes("x".repeat(900))).toHaveLength(NOTES_MAX_LENGTH);
   });
   it("sans photo, le dit explicitement", () => {
     expect(buildProductTextPrompt(hints, false)).toContain("Aucune photo");

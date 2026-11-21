@@ -12,8 +12,13 @@ import { readUploadedFile } from "@/server/media/images";
 import { attachDraftToProduct, createProductDraft, discardDraft, EXTRA_SLOTS, MAX_EXTRAS, type DraftResult } from "./draft-service";
 import { isAiFeatureEnabled } from "./client";
 import { testAiConnection } from "./product-text";
+import { cleanNotes } from "./product-text-prompt";
 
 const uuid = z.uuid();
+const draftOptionsSchema = z.object({
+  extraCount: z.union([z.literal(0), z.literal(1), z.literal(2)]),
+  extraKind: z.enum(["montage", "ai"]),
+});
 
 /** Un seul clic : fond blanc + 2 montages locaux + nom/description (+ 2 mises en scène IA si demandées). Rien n'est enregistré sur un produit. */
 export async function generateProductDraftAction(formData: FormData): Promise<DraftResult> {
@@ -27,12 +32,17 @@ export async function generateProductDraftAction(formData: FormData): Promise<Dr
   const category = uuid.safeParse(categoryId).success
     ? await prisma.category.findUnique({ where: { id: categoryId }, select: { name: true } })
     : null;
-  const aiScenes = formData.get("aiScenes") === "on";
+  const options = draftOptionsSchema.safeParse({
+    extraCount: Number(formData.get("extraCount") ?? 2),
+    extraKind: formData.get("extraKind") ?? "montage",
+  });
+  if (!options.success) return { ok: false, message: "Choix de photos invalide." };
+  const notes = cleanNotes(String(formData.get("notes") ?? ""));
   return createProductDraft(
     upload.file,
-    { name, description: "", brand: "", reference: "", categoryName: category?.name ?? "" },
+    { name, description: "", brand: "", reference: "", categoryName: category?.name ?? "", notes },
     admin.id,
-    { aiScenes },
+    options.data,
   );
 }
 

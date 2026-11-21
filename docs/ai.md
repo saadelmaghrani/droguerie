@@ -9,8 +9,13 @@ L'IA n'est proposée **qu'à l'ajout d'un produit** (`/admin/produits/nouveau`),
 
 ## Parcours (option B « hybride économique »)
 
-1. L'admin choisit **une photo** du produit, puis clique sur **Générer avec l'IA**.
-   Case facultative **« Ajouter 2 mises en scène IA réalistes »**, **décochée par défaut** (produits phares).
+1. L'admin choisit **une photo** du produit, puis règle avant de cliquer sur **Générer avec l'IA** :
+   - **Photos supplémentaires** : Aucune / 1 / 2 (défaut : 2) ;
+   - **type** : montages avec le produit d'origine (gratuits, défaut) ou mises en scène IA réalistes (payantes) ;
+   - **Notes pour l'IA** (facultatif, 500 caractères) : matière, marque, taille, usage, argument clé… Elles sont
+     ajoutées à la consigne du texte, entre délimiteurs, comme **faits fiables à utiliser en priorité** ; l'IA a
+     pour consigne de les traiter comme des informations, jamais comme des ordres (pas de prix, etc.).
+   - **Coût estimé** affiché en direct (`src/lib/ai-costs.ts`, testé) : ≈ 0,001 $ (texte) + ≈ 0,05 $ par mise en scène IA.
 2. Le serveur enregistre la photo, la **détoure une seule fois**, puis prépare en parallèle :
 
 | Résultat | Technique | Fidélité | Coût |

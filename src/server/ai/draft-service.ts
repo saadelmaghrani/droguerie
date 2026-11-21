@@ -17,6 +17,7 @@ import { prisma } from "@/lib/prisma";
 import { deleteImageFiles, processImage, type ProcessedImage } from "@/server/media/images";
 import { localStorage } from "@/server/media/storage";
 import type { AiGenerationType } from "@/generated/prisma/client";
+import type { ExtraCount, ExtraKind } from "@/lib/ai-costs";
 import { ACCOUNT_ACTION_KINDS, AiError, classifyOpenAiError } from "./errors";
 import { generateProductText } from "./product-text";
 import { estimateCostUsd, type ProductTextHints } from "./product-text-prompt";
@@ -117,7 +118,8 @@ export async function createProductDraft(
   file: File,
   hints: ProductTextHints,
   adminUserId: string,
-  options: { aiScenes: boolean },
+  /** extraCount : 0 à 2 photos supplémentaires ; extraKind : montages locaux (gratuits) ou mises en scène IA. */
+  options: { extraCount: ExtraCount; extraKind: ExtraKind },
 ): Promise<DraftResult> {
   await cleanupStaleDrafts();
   const draftId = crypto.randomUUID();
@@ -136,7 +138,9 @@ export async function createProductDraft(
   const ctx = { draftId, adminUserId, inputImageKey: original.key };
 
   // Plafond du site : vérifié une fois pour toutes les parties payantes demandées.
-  const overBudget = await budgetError(ESTIMATED_COST_USD.text + (options.aiScenes ? 2 * ESTIMATED_COST_USD.scene : 0));
+  const aiSceneCount = options.extraKind === "ai" ? options.extraCount : 0;
+  const montageCount = options.extraKind === "montage" ? options.extraCount : 0;
+  const overBudget = await budgetError(ESTIMATED_COST_USD.text + aiSceneCount * ESTIMATED_COST_USD.scene);
   const guard = () => {
     if (overBudget) throw overBudget;
   };
@@ -149,14 +153,14 @@ export async function createProductDraft(
     const image = toDraftImage(await storePng(await composeWhite(await cutout), draftId, "studio.png"));
     return { value: image, output: { ...image, role: "studio" }, model: "isnet-general-use", costUsd: 0 };
   });
-  const montages = MONTAGES.map(({ slot, style }) =>
+  const montages = MONTAGES.slice(0, montageCount).map(({ slot, style }) =>
     runPart<DraftImage>(ctx, "IMAGE_STUDIO", "local", "isnet-general-use", async () => {
       const image = toDraftImage(await storePng(await composeMontage(await cutout, style), draftId, `${slot}.png`));
       return { value: image, output: { ...image, role: "extra", slot }, model: "isnet-general-use", costUsd: 0 };
     }).then((part): DraftExtra => ({ slot, kind: "montage", label: MONTAGE_LABELS[style], part })),
   );
-  const aiScenes = options.aiScenes
-    ? ([0, 1] as const).map((index) => {
+  const aiScenes = aiSceneCount > 0
+    ? ([0, 1] as const).slice(0, aiSceneCount).map((index) => {
         const slot: ExtraSlot = index === 0 ? "ai-0" : "ai-1";
         return runPart<DraftImage>(ctx, "IMAGE_SCENE", "openai", "", async () => {
           guard();
