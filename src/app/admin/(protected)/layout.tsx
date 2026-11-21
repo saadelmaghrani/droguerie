@@ -10,6 +10,7 @@
 //  │ Admin ⎋  │               │        │                  │
 //  └──────────┴───────────────┘        └──────────────────┘
 import { Suspense } from "react";
+import { Toaster } from "@/components/ui/sonner";
 import { AdminBrand } from "./_components/admin-brand";
 import { AdminNav } from "./_components/admin-nav";
 import { AdminUserMenu, AdminUserMenuSkeleton } from "./_components/admin-user-menu";
@@ -51,6 +52,9 @@ export default function ProtectedAdminLayout({ children }: { children: React.Rea
           <div className="mx-auto w-full max-w-6xl">{children}</div>
         </main>
       </div>
+
+      {/* Notifications (« Numéro ajouté », erreurs…) */}
+      <Toaster position="top-center" />
     </div>
   );
 }

@@ -36,6 +36,7 @@ Espace administrateur : http://localhost:3000/admin (identifiants : `ADMIN_EMAIL
 | `npm run dev` | Serveur de développement |
 | `npm run build` / `npm start` | Build et serveur de production |
 | `npm run lint` | Analyse du code (ESLint) |
+| `npm test` | Tests unitaires (Vitest) |
 | `npm run clean` | Supprime le cache de compilation `.next` (voir Dépannage) |
 | `npm run db:up` / `db:down` | Démarrer / arrêter PostgreSQL |
 | `npm run db:migrate -- --name <nom>` | Nouvelle migration après modification du schéma |
@@ -62,6 +63,7 @@ Arrêter toujours le serveur avec `Ctrl + C` plutôt que de fermer brutalement l
 | [`docs/database.md`](docs/database.md) | Tables, règles métier, recherche, migrations |
 | [`docs/authentication.md`](docs/authentication.md) | Sessions admin, sécurité, règles à respecter |
 | [`docs/admin-ui.md`](docs/admin-ui.md) | Interface admin : structure, ajouter une page, thème |
+| [`docs/whatsapp.md`](docs/whatsapp.md) | Numéros WhatsApp : formats acceptés, règles métier |
 
 ## Variables d'environnement
 

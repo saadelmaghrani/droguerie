@@ -94,10 +94,13 @@ async function seedDemoData() {
   }
 
   // Numéro manifestement fictif : il devra être remplacé dans l'admin.
+  // Il ne devient « par défaut » que si aucun numéro par défaut n'existe déjà
+  // (sinon l'index unique partiel refuserait un second défaut).
+  const hasDefault = (await prisma.whatsappNumber.count({ where: { isDefault: true } })) > 0;
   const whatsapp = await prisma.whatsappNumber.upsert({
     where: { phone: "212600000000" },
     update: {},
-    create: { label: `${DEMO} Numéro principal du magasin`, phone: "212600000000", isDefault: true },
+    create: { label: `${DEMO} Numéro principal du magasin`, phone: "212600000000", isDefault: !hasDefault },
   });
 
   let sortOrder = 0;
