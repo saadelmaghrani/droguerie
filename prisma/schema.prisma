@@ -1,6 +1,18 @@
-// Schéma de la base de données (source de vérité).
+// ─────────────────────────────────────────────────────────────────────────────
+// Schéma de la base de données — source de vérité.
 // Après chaque modification : `npm run db:migrate` (crée + applique une migration).
-// Les modèles métier (produits, catégories…) seront ajoutés à la tâche suivante.
+//
+// Conventions :
+//   - Noms en camelCase dans le code TypeScript, snake_case dans PostgreSQL (@map / @@map).
+//   - Identifiants UUID v7 : uniques ET triés par date de création (bons pour les index).
+//   - AUCUN champ « prix » : exigence du cahier des charges.
+//
+// Règles écrites en SQL dans les migrations (Prisma ne sait pas les exprimer) :
+//   - un seul numéro WhatsApp « par défaut »            (index unique partiel)
+//   - position des photos comprise entre 0 et 2         (contrainte CHECK)
+//   - une seule ligne dans store_settings               (contrainte CHECK)
+//   - index de recherche plein texte et trigrammes      (index sur expression)
+// ─────────────────────────────────────────────────────────────────────────────
 
 generator client {
   provider = "prisma-client"
@@ -9,4 +21,238 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+}
+
+// ═════════════════════════════ ÉNUMÉRATIONS ═════════════════════════════════
+
+/// Cycle de vie d'un produit.
+enum ProductStatus {
+  DRAFT // brouillon : visible seulement dans l'admin (aperçu possible)
+  PUBLISHED // visible sur le site public
+  HIDDEN // désactivé : retiré du site sans être supprimé
+
+  @@map("product_status")
+}
+
+/// Origine d'une photo produit.
+enum ImageSource {
+  ORIGINAL // photo envoyée telle quelle
+  ENHANCED // corrections globales (luminosité, netteté…)
+  AI_STUDIO // produit détouré posé sur un fond studio
+
+  @@map("image_source")
+}
+
+enum AiGenerationType {
+  TEXT // nom + description à partir d'une photo
+  IMAGE_ENHANCE // amélioration de la qualité
+  IMAGE_STUDIO // détourage + fond studio
+
+  @@map("ai_generation_type")
+}
+
+enum AiGenerationStatus {
+  PENDING // résultat proposé, en attente de décision de l'admin
+  ACCEPTED // validé par l'admin
+  REJECTED // refusé par l'admin
+  FAILED // erreur du fournisseur IA
+
+  @@map("ai_generation_status")
+}
+
+enum AnalyticsEventType {
+  PAGE_VIEW
+  PRODUCT_VIEW
+  CATEGORY_VIEW
+  WHATSAPP_CLICK
+
+  @@map("analytics_event_type")
+}
+
+// ═══════════════════════════════ ADMINISTRATION ═════════════════════════════
+
+/// Compte administrateur. Pas d'inscription publique : créé par le seed.
+model AdminUser {
+  id           String    @id @default(uuid(7)) @db.Uuid
+  email        String    @unique
+  passwordHash String    @map("password_hash") // argon2id, jamais le mot de passe en clair
+  name         String
+  lastLoginAt  DateTime? @map("last_login_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  aiGenerations AiGeneration[]
+
+  @@map("admin_users")
+}
+
+/// Paramètres du magasin : une seule ligne (id = 1). Tout champ vide est masqué sur le site.
+model StoreSettings {
+  id           Int     @id @default(1)
+  storeName    String  @map("store_name")
+  logoKey      String? @map("logo_key")
+  primaryColor String  @default("#334155") @map("primary_color") // #RRGGBB
+
+  heroTitle    String? @map("hero_title")
+  heroSubtitle String? @map("hero_subtitle")
+  heroImageKey String? @map("hero_image_key")
+  heroCtaLabel String? @map("hero_cta_label")
+
+  aboutText    String? @map("about_text")
+  address      String?
+  openingHours String? @map("opening_hours")
+  phone        String?
+  email        String?
+  mapsEmbedUrl String? @map("maps_embed_url") // validé : https://www.google.com/maps/embed…
+  socialLinks  Json?   @map("social_links") // { facebook?: url, instagram?: url, … }
+
+  seoTitle       String? @map("seo_title")
+  seoDescription String? @map("seo_description")
+
+  showFeatured    Boolean @default(true) @map("show_featured")
+  showNewArrivals Boolean @default(true) @map("show_new_arrivals")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("store_settings")
+}
+
+// ════════════════════════════════ CATALOGUE ═════════════════════════════════
+
+/// Numéro WhatsApp. Peut être partagé par plusieurs catégories.
+/// Celui marqué « par défaut » sert de repli pour les catégories sans numéro.
+model WhatsappNumber {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  label     String // ex. « Service peinture »
+  phone     String   @unique // format international sans « + » : 2126XXXXXXXX
+  isDefault Boolean  @default(false) @map("is_default")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  categories Category[]
+
+  @@map("whatsapp_numbers")
+}
+
+/// Catégorie de produits (un seul niveau, pas de sous-catégories).
+model Category {
+  id               String          @id @default(uuid(7)) @db.Uuid
+  name             String          @unique
+  slug             String          @unique // utilisé dans l'URL : /categories/peinture
+  description      String?
+  imageKey         String?         @map("image_key")
+  sortOrder        Int             @default(0) @map("sort_order")
+  isActive         Boolean         @default(true) @map("is_active")
+  // Supprimer un numéro ne supprime pas la catégorie : elle retombe sur le numéro par défaut.
+  whatsappNumberId String?         @map("whatsapp_number_id") @db.Uuid
+  whatsappNumber   WhatsappNumber? @relation(fields: [whatsappNumberId], references: [id], onDelete: SetNull)
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
+
+  products        Product[]
+  analyticsEvents AnalyticsEvent[]
+
+  @@index([isActive, sortOrder])
+  @@map("categories")
+}
+
+/// Produit du catalogue. Aucun prix, volontairement.
+model Product {
+  id            String        @id @default(uuid(7)) @db.Uuid
+  name          String
+  slug          String        @unique // utilisé dans l'URL : /produits/eponge-grattoir-x10
+  description   String?
+  reference     String?       @unique // référence article (facultative, unique si renseignée)
+  brand         String? // marque (facultative)
+  status        ProductStatus @default(DRAFT)
+  isFeatured    Boolean       @default(false) @map("is_featured")
+  featuredOrder Int?          @map("featured_order")
+  // RESTRICT : impossible de supprimer une catégorie qui contient encore des produits.
+  categoryId    String        @map("category_id") @db.Uuid
+  category      Category      @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  publishedAt   DateTime?     @map("published_at") // sert au tri « Nouveautés »
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  images          ProductImage[]
+  aiGenerations   AiGeneration[]
+  analyticsEvents AnalyticsEvent[]
+
+  @@index([status, categoryId]) // catalogue filtré par catégorie
+  @@index([status, publishedAt(sort: Desc)]) // « Nouveautés »
+  @@index([isFeatured, featuredOrder]) // « Produits mis en avant »
+  @@map("products")
+}
+
+/// Photo d'un produit : 3 maximum (position 0 = principale, 1 et 2 = secondaires).
+model ProductImage {
+  id                 String      @id @default(uuid(7)) @db.Uuid
+  productId          String      @map("product_id") @db.Uuid
+  product            Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  position           Int         @db.SmallInt
+  storageKey         String      @map("storage_key") // fichier affiché
+  originalStorageKey String?     @map("original_storage_key") // photo d'origine conservée si retouchée par l'IA
+  source             ImageSource @default(ORIGINAL)
+  width              Int
+  height             Int
+  createdAt          DateTime    @default(now()) @map("created_at")
+
+  @@unique([productId, position]) // une seule photo par emplacement
+  @@map("product_images")
+}
+
+// ════════════════════════════ INTELLIGENCE ARTIFICIELLE ═════════════════════
+
+/// Historique de chaque appel IA : traçabilité, validation et suivi des coûts.
+model AiGeneration {
+  id               String             @id @default(uuid(7)) @db.Uuid
+  type             AiGenerationType
+  status           AiGenerationStatus @default(PENDING)
+  productId        String?            @map("product_id") @db.Uuid
+  product          Product?           @relation(fields: [productId], references: [id], onDelete: SetNull)
+  adminUserId      String?            @map("admin_user_id") @db.Uuid
+  adminUser        AdminUser?         @relation(fields: [adminUserId], references: [id], onDelete: SetNull)
+  inputImageKey    String             @map("input_image_key")
+  output           Json? // { name, description } ou { imageKey }
+  provider         String
+  model            String?
+  inputTokens      Int?               @map("input_tokens")
+  outputTokens     Int?               @map("output_tokens")
+  imagesCount      Int                @default(0) @map("images_count")
+  estimatedCostUsd Decimal            @default(0) @map("estimated_cost_usd") @db.Decimal(10, 4)
+  durationMs       Int?               @map("duration_ms")
+  errorMessage     String?            @map("error_message")
+  createdAt        DateTime           @default(now()) @map("created_at")
+  decidedAt        DateTime?          @map("decided_at")
+
+  @@index([createdAt]) // somme des coûts du mois / du jour
+  @@index([productId])
+  @@map("ai_generations")
+}
+
+// ═════════════════════════════════ STATISTIQUES ═════════════════════════════
+
+/// Un événement de visite. Aucune donnée personnelle : le visiteur est un hachage
+/// anonyme qui change chaque jour (pas de cookie de traçage).
+model AnalyticsEvent {
+  // Entier auto-incrémenté : table à fort volume, insertion la plus légère possible.
+  id          BigInt             @id @default(autoincrement())
+  type        AnalyticsEventType
+  // SET NULL : supprimer un produit conserve les totaux historiques du site.
+  productId   String?            @map("product_id") @db.Uuid
+  product     Product?           @relation(fields: [productId], references: [id], onDelete: SetNull)
+  categoryId  String?            @map("category_id") @db.Uuid
+  category    Category?          @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  visitorHash String             @map("visitor_hash")
+  sessionId   String             @map("session_id")
+  path        String
+  referrer    String?
+  deviceType  String?            @map("device_type") // mobile | tablet | desktop
+  createdAt   DateTime           @default(now()) @map("created_at")
+
+  @@index([type, createdAt])
+  @@index([productId, type, createdAt])
+  @@index([categoryId, type, createdAt])
+  @@map("analytics_events")
 }
