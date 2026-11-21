@@ -16,7 +16,8 @@
     "db:generate": "prisma generate",
     "db:studio": "prisma studio",
     "db:seed": "prisma db seed",
-    "ai:model": "node scripts/download-ai-model.mjs"
+    "ai:model": "node scripts/download-ai-model.mjs",
+    "import:demo": "tsx --tsconfig scripts/tsconfig.json scripts/import-demo-products.ts"
   },
   "overrides": {
     "effect": "3.22.5",

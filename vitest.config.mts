@@ -12,7 +12,7 @@ export default defineConfig({
     },
   },
   test: {
-    include: ["src/**/*.test.ts"],
+    include: ["src/**/*.test.ts", "scripts/**/*.test.ts"],
     environment: "node",
     testTimeout: 30_000, // le test de détourage charge un modèle de 170 Mo
   },

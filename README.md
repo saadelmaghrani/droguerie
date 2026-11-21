@@ -43,6 +43,7 @@ Espace administrateur : http://localhost:3000/admin (identifiants : `ADMIN_EMAIL
 | `npm run db:migrate -- --name <nom>` | Nouvelle migration après modification du schéma |
 | `npm run db:seed` | Données initiales (relançable sans doublons) |
 | `npm run db:studio` | Explorer la base dans le navigateur |
+| `npm run import:demo -- <fichier.json>` | Produits de **démonstration** (dév. uniquement) : catégories, photo principale, sans doublon (voir `scripts/import-demo-products.ts`) |
 | `npm run ai:model` | Télécharge le modèle de détourage (IA, fond blanc), empreinte vérifiée |
 
 ## Dépannage
