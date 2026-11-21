@@ -3,6 +3,7 @@
 // AVANT de lire le fichier envoyé.
 
 import { refresh } from "next/cache";
+import { invalidateCatalogue } from "@/server/catalogue/cache";
 import { Prisma } from "@/generated/prisma/client";
 import { requireAdmin } from "@/server/auth/dal";
 import { analyzeCsv, importCsv, type AnalysisResult, type ImportResult } from "./import";
@@ -26,7 +27,10 @@ export async function runProductImport(formData: FormData): Promise<ImportResult
   if (!file) return { ok: false, message: "Aucun fichier reçu." };
   try {
     const result = await importCsv(file);
-    if (result.ok) refresh();
+    if (result.ok) {
+      refresh();
+      invalidateCatalogue();
+    }
     return result;
   } catch (error) {
     // Transaction annulée : rien n'a été écrit.

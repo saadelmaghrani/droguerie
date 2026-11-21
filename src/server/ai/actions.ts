@@ -7,6 +7,7 @@
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/server/auth/dal";
+import { invalidateCatalogue } from "@/server/catalogue/cache";
 import { readUploadedFile } from "@/server/media/images";
 import { attachDraftToProduct, createProductDraft, discardDraft, EXTRA_SLOTS, MAX_EXTRAS, type DraftResult } from "./draft-service";
 import { testAiConnection } from "./product-text";
@@ -45,7 +46,9 @@ export async function attachProductDraftAction(productId: string, draftId: strin
   if (!uuid.safeParse(productId).success || !uuid.safeParse(draftId).success || !parsed.success) {
     return { ok: false as const, message: "Requête invalide." };
   }
-  return attachDraftToProduct(productId, draftId, parsed.data);
+  const result = await attachDraftToProduct(productId, draftId, parsed.data);
+  if (result.ok) invalidateCatalogue();
+  return result;
 }
 
 export async function discardProductDraftAction(draftId: string): Promise<void> {

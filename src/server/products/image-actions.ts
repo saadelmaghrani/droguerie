@@ -3,6 +3,7 @@
 // AVANT de lire le fichier envoyé.
 
 import { refresh } from "next/cache";
+import { invalidateCatalogue } from "@/server/catalogue/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/server/auth/dal";
@@ -39,7 +40,10 @@ export async function uploadProductImage(productId: string, formData: FormData):
   if (!processed.ok) return { ok: false, message: processed.error };
 
   const result = await addProductImage(productId, processed.image);
-  if (result.ok) refresh();
+  if (result.ok) {
+    refresh();
+    invalidateCatalogue();
+  }
   return result;
 }
 
@@ -55,7 +59,10 @@ export async function replaceProductImageFile(imageId: string, formData: FormDat
   if (!processed.ok) return { ok: false, message: processed.error };
 
   const result = await replaceProductImage(imageId, processed.image);
-  if (result.ok) refresh();
+  if (result.ok) {
+    refresh();
+    invalidateCatalogue();
+  }
   return result;
 }
 
@@ -64,7 +71,10 @@ async function run(imageId: unknown, operation: (id: string) => Promise<ImageSer
   const parsed = uuid.safeParse(imageId);
   if (!parsed.success) return INVALID;
   const result = await operation(parsed.data);
-  if (result.ok) refresh();
+  if (result.ok) {
+    refresh();
+    invalidateCatalogue();
+  }
   return result;
 }
 
@@ -84,6 +94,9 @@ export async function restoreOriginalProductImage(imageId: string): Promise<Imag
   await requireAdmin();
   if (!uuid.safeParse(imageId).success) return INVALID;
   const result = await restoreOriginalImage(imageId);
-  if (result.ok) refresh();
+  if (result.ok) {
+    refresh();
+    invalidateCatalogue();
+  }
   return result;
 }

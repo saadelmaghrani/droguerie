@@ -70,6 +70,7 @@ Arrêter toujours le serveur avec `Ctrl + C` plutôt que de fermer brutalement l
 | [`docs/products.md`](docs/products.md) | Produits : recherche, filtres, règles de la fiche |
 | [`docs/images.md`](docs/images.md) | Images : traitement, tailles, sécurité, stockage |
 | [`docs/settings.md`](docs/settings.md) | Paramètres du magasin : champs, sécurité des liens |
+| [`docs/site.md`](docs/site.md) | Site public : pages, visibilité, recherche, cache |
 | [`docs/ai.md`](docs/ai.md) | IA à l'ajout d'un produit : fond blanc, mises en scène, texte, compte OpenAI, erreurs |
 
 ## Variables d'environnement

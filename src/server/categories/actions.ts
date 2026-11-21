@@ -2,6 +2,7 @@
 // Actions serveur des catégories. Points d'entrée publics : chacune commence par requireAdmin().
 
 import { refresh } from "next/cache";
+import { invalidateCatalogue } from "@/server/catalogue/cache";
 import { z } from "zod";
 import { isValidSlug, SLUG_MAX_LENGTH } from "@/lib/slug";
 import { requireAdmin } from "@/server/auth/dal";
@@ -92,6 +93,7 @@ export async function saveCategory(_previous: CategoryFormState, formData: FormD
     };
   }
   refresh();
+  invalidateCatalogue();
   return { ok: true, message: result.message, submissionId: Date.now() };
 }
 
@@ -100,7 +102,10 @@ async function runRowAction(id: unknown, operation: (id: string) => Promise<Serv
   const parsed = z.uuid().safeParse(id);
   if (!parsed.success) return { ok: false, message: "Requête invalide." };
   const result = await operation(parsed.data);
-  if (result.ok) refresh();
+  if (result.ok) {
+    refresh();
+    invalidateCatalogue();
+  }
   return result;
 }
 

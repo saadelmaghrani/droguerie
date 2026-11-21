@@ -20,7 +20,7 @@ Page d'administration : `/admin/categories`. Un seul niveau (pas de sous-catégo
 | Adresse générée depuis le nom à la création ; **conservée** au renommage (avertissement si modifiée à la main) | Formulaire |
 | Nouvelle catégorie placée en fin de liste | `createCategory` |
 | Suppression **refusée** si la catégorie contient des produits | `deleteCategory` + base (`ON DELETE RESTRICT`) + menu grisé |
-| Catégorie masquée → **elle et tous ses produits** disparaissent du site | Décision du 21/11/2026, à appliquer dans les requêtes du site public |
+| Catégorie masquée → **elle et tous ses produits** disparaissent du site (listes, recherche, adresse directe) | `src/server/catalogue/queries.ts` (testé) |
 | Numéro associé désactivé → le numéro par défaut est utilisé (avertissement affiché) | Résolution WhatsApp (voir `docs/whatsapp.md`) |
 
 ## Code

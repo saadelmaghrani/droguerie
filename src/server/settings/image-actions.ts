@@ -2,6 +2,7 @@
 // Logo et image de bannière du magasin. Points d'entrée publics : requireAdmin() en premier.
 
 import { refresh } from "next/cache";
+import { invalidateCatalogue } from "@/server/catalogue/cache";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/server/auth/dal";
 import { deleteImageFiles, processImage, readUploadedFile } from "@/server/media/images";
@@ -33,6 +34,8 @@ export async function uploadStoreImage(kind: Kind, formData: FormData): Promise<
   if (oldKey) await deleteImageFiles(oldKey, kind);
 
   refresh();
+
+  invalidateCatalogue();
   return { ok: true, message: `${LABEL[kind]} enregistré${kind === "hero" ? "e" : ""}.` };
 }
 
@@ -47,5 +50,7 @@ export async function removeStoreImage(kind: Kind): Promise<Result> {
   await deleteImageFiles(key, kind);
 
   refresh();
+
+  invalidateCatalogue();
   return { ok: true, message: `${LABEL[kind]} retiré${kind === "hero" ? "e" : ""}.` };
 }

@@ -2,6 +2,7 @@
 // Action serveur des paramètres du magasin. Point d'entrée public : requireAdmin() en premier.
 
 import { refresh } from "next/cache";
+import { invalidateCatalogue } from "@/server/catalogue/cache";
 import { z } from "zod";
 import { isHexColor } from "@/lib/color";
 import { parseMapsEmbed, parseSocialUrl, type SocialNetwork } from "@/lib/external-links";
@@ -96,5 +97,6 @@ export async function saveStoreSettings(_previous: SettingsFormState, formData: 
     showNewArrivals: formData.get("showNewArrivals") === "on",
   });
   refresh();
+  invalidateCatalogue();
   return { ok: true, message: "Paramètres enregistrés.", submissionId };
 }

@@ -2,6 +2,7 @@
 // Actions serveur des produits. Points d'entrée publics : chacune commence par requireAdmin().
 
 import { refresh } from "next/cache";
+import { invalidateCatalogue } from "@/server/catalogue/cache";
 import { z } from "zod";
 import { isValidSlug, SLUG_MAX_LENGTH, slugify } from "@/lib/slug";
 import { requireAdmin } from "@/server/auth/dal";
@@ -94,6 +95,7 @@ export async function saveProduct(_previous: ProductFormState, formData: FormDat
     };
   }
   refresh();
+  invalidateCatalogue();
   return { ok: true, message: result.message, id: result.id!, created: !id, submissionId };
 }
 
@@ -102,7 +104,10 @@ async function runRowAction(id: unknown, operation: (id: string) => Promise<Serv
   const parsed = z.uuid().safeParse(id);
   if (!parsed.success) return { ok: false, message: "Requête invalide." };
   const result = await operation(parsed.data);
-  if (result.ok) refresh();
+  if (result.ok) {
+    refresh();
+    invalidateCatalogue();
+  }
   return result;
 }
 

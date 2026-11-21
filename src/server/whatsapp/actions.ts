@@ -3,6 +3,7 @@
 // Ce sont des points d'entrée publics (requêtes HTTP) : chacune commence par requireAdmin().
 
 import { refresh } from "next/cache";
+import { invalidateCatalogue } from "@/server/catalogue/cache";
 import { z } from "zod";
 import { normalizePhone } from "@/lib/phone";
 import { requireAdmin } from "@/server/auth/dal";
@@ -72,6 +73,7 @@ export async function saveWhatsappNumber(_previous: FormState, formData: FormDat
     };
   }
   refresh();
+  invalidateCatalogue();
   return { ok: true, message: result.message, submissionId: Date.now() };
 }
 
@@ -80,7 +82,10 @@ async function runRowAction(id: unknown, operation: (id: string) => Promise<Serv
   const parsed = idSchema.safeParse(id);
   if (!parsed.success) return { ok: false, message: "Requête invalide." };
   const result = await operation(parsed.data);
-  if (result.ok) refresh();
+  if (result.ok) {
+    refresh();
+    invalidateCatalogue();
+  }
   return result;
 }
 
