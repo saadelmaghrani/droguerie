@@ -15,7 +15,7 @@ import { ImageDropzone } from "../../_components/image-dropzone";
 
 export type ProductDraft = Extract<DraftResult, { ok: true }>;
 
-const STEPS = ["Photo principale fond blanc (produit intact)", "2 photos de mise en scène", "Nom et description"];
+const STEPS = ["Photo principale fond blanc (produit intact)", "2 montages (studio, table) avec le produit d'origine", "Nom et description"];
 
 export function NewProductAi({
   configured,
@@ -37,6 +37,7 @@ export function NewProductAi({
   const [file, setFile] = useState<{ file: File; url: string } | null>(null);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [aiScenes, setAiScenes] = useState(false); // option payante, décochée par défaut
 
   useEffect(() => () => {
     if (file) URL.revokeObjectURL(file.url);
@@ -50,12 +51,13 @@ export function NewProductAi({
     data.set("file", file.file);
     data.set("name", hints.name);
     data.set("categoryId", hints.categoryId);
+    if (aiScenes) data.set("aiScenes", "on");
     startTransition(async () => {
       try {
         const result = await generateProductDraftAction(data);
         if (result.ok) {
           onGenerated(result);
-          const failures = [result.studio, result.text, ...result.scenes].filter((p) => !p.ok).length;
+          const failures = [result.studio, result.text, ...result.extras.map((e) => e.part)].filter((p) => !p.ok).length;
           if (failures === 0) toast.success("Proposition prête : vérifiez les photos et le texte, puis créez le produit.");
           else toast.warning("Proposition partielle : certaines parties n'ont pas pu être générées (détails ci-dessous).");
         } else setError(result.message);
@@ -87,8 +89,9 @@ export function NewProductAi({
           <>
             <ul className="grid gap-1.5 text-sm">
               <PartLine label={STEPS[0]!} part={draft.studio} />
-              <PartLine label="Photo de mise en scène 1" part={draft.scenes[0]} />
-              <PartLine label="Photo de mise en scène 2" part={draft.scenes[1]} />
+              {draft.extras.map((extra) => (
+                <PartLine key={extra.slot} label={extra.kind === "ai" ? extra.label : `Montage : ${extra.label.toLowerCase()}`} part={extra.part} />
+              ))}
               <PartLine label={STEPS[2]!} part={draft.text} />
             </ul>
             <p className="text-sm text-muted-foreground">
@@ -104,14 +107,16 @@ export function NewProductAi({
         ) : isPending ? (
           <div className="grid gap-3" aria-live="polite">
             <ul className="grid gap-1.5 text-sm">
-              {STEPS.map((step) => (
+              {[...STEPS, ...(aiScenes ? ["2 mises en scène IA (OpenAI)"] : [])].map((step) => (
                 <li key={step} className="flex items-center gap-2">
                   <Loader2 className="size-4 animate-spin text-muted-foreground" aria-hidden />
                   {step}
                 </li>
               ))}
             </ul>
-            <p className="text-sm text-muted-foreground">Génération en cours, environ une minute. Ne fermez pas la page.</p>
+            <p className="text-sm text-muted-foreground">
+              {aiScenes ? "Génération en cours, environ une minute. Ne fermez pas la page." : "Génération en cours, quelques secondes…"}
+            </p>
           </div>
         ) : (
           <>
@@ -145,14 +150,29 @@ export function NewProductAi({
                 <p>À partir d&apos;une seule photo, en un clic :</p>
                 <ul className="grid list-disc gap-1 pl-5 text-muted-foreground">
                   <li>photo principale sur fond blanc, <strong>produit strictement identique</strong> ;</li>
-                  <li>2 photos de mise en scène (générées par OpenAI, à vérifier) ;</li>
+                  <li>2 montages (studio, table en bois) avec le produit d&apos;origine, gratuits ;</li>
                   <li>nom et description en français (sans prix, sans caractéristique inventée).</li>
                 </ul>
+                <label className={`flex items-start gap-2 rounded-lg border p-3 ${configured ? "cursor-pointer" : "opacity-60"}`}>
+                  <input
+                    type="checkbox"
+                    checked={aiScenes}
+                    disabled={!configured || disabled}
+                    onChange={(e) => setAiScenes(e.target.checked)}
+                    className="mt-0.5 size-4 accent-primary"
+                  />
+                  <span className="grid gap-0.5">
+                    <span className="font-medium">Ajouter 2 mises en scène IA réalistes</span>
+                    <span className="text-xs text-muted-foreground">
+                      Pour les produits phares. Images redessinées par OpenAI (à vérifier), environ 0,10 $ et une minute de plus.
+                    </span>
+                  </span>
+                </label>
                 {!configured && (
                   <p className="flex items-start gap-1.5 text-amber-800">
                     <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
                     <span>
-                      OpenAI n&apos;est pas configuré : seule la photo fond blanc sera générée.{" "}
+                      OpenAI n&apos;est pas configuré : seules les photos (fond blanc et montages) seront générées, pas le texte.{" "}
                       <Link href="/admin/parametres#ia" className="underline">Paramètres</Link>
                     </span>
                   </p>

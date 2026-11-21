@@ -27,7 +27,7 @@ import { slugify } from "@/lib/slug";
 import { removeProduct, saveProduct, type ProductFormState, type ProductFormValues } from "@/server/products/actions";
 import { uploadProductImage } from "@/server/products/image-actions";
 import { attachProductDraftAction } from "@/server/ai/actions";
-import { DraftPhotos, type DraftChoice } from "./draft-photos";
+import { defaultDraftChoice, DraftPhotos, type DraftChoice } from "./draft-photos";
 import { NewProductAi, type ProductDraft } from "./new-product-ai";
 import { PendingImages, type PendingImage } from "./pending-images";
 import { ProductImages, type ProductImage } from "./product-images";
@@ -75,7 +75,7 @@ export function ProductForm({
   const [uploadProgress, setUploadProgress] = useState<string | null>(null);
   // Création avec l'IA : proposition générée (photos + texte) et choix de l'admin.
   const [draft, setDraft] = useState<ProductDraft | null>(null);
-  const [draftChoice, setDraftChoice] = useState<DraftChoice>({ main: "original", keepScenes: [] });
+  const [draftChoice, setDraftChoice] = useState<DraftChoice>({ main: "original", keep: [] });
   const [generating, setGenerating] = useState(false);
   const [slugEdited, setSlugEdited] = useState(Boolean(product));
   const set = <K extends keyof ProductFormValues>(key: K, value: ProductFormValues[K]) => setValues((v) => ({ ...v, [key]: value }));
@@ -160,7 +160,7 @@ export function ProductForm({
               onGenerating={setGenerating}
               onGenerated={(result) => {
                 setDraft(result);
-                setDraftChoice({ main: result.studio.ok ? "studio" : "original", keepScenes: result.scenes.map(() => false) });
+                setDraftChoice(defaultDraftChoice(result));
                 if (result.text.ok) {
                   const { name, description } = result.text.value;
                   setValues((v) => ({ ...v, name, description, slug: slugEdited ? v.slug : slugify(name) }));

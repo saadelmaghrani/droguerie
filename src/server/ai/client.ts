@@ -6,8 +6,14 @@ import "server-only";
 import OpenAI from "openai";
 import { AiError } from "./errors";
 
-/** Modèle par défaut : bon équilibre qualité / coût, lit les photos. Modifiable via OPENAI_MODEL. */
-export const DEFAULT_OPENAI_MODEL = "gpt-6.2-sol";
+/** Modèle par défaut : le plus économique, lit les photos (≈ 0,001 $ par fiche). Modifiable via OPENAI_MODEL. */
+export const DEFAULT_OPENAI_MODEL = "gpt-6-luna";
+
+/** Plafond mensuel des dépenses IA DU SITE, en dollars (en plus du plafond du compte OpenAI). */
+export function aiMonthlyBudgetUsd(): number {
+  const value = Number.parseFloat(process.env.AI_MONTHLY_BUDGET_USD ?? "");
+  return Number.isFinite(value) && value >= 0 ? value : 10;
+}
 
 export function aiModel(): string {
   return process.env.OPENAI_MODEL?.trim() || DEFAULT_OPENAI_MODEL;

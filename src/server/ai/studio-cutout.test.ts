@@ -2,7 +2,7 @@
 import { existsSync } from "node:fs";
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
-import { alphaBounds, cutoutMask, cutoutModelPath, refineAlpha, STUDIO_BACKGROUND, studioFromCutout } from "./studio-cutout";
+import { alphaBounds, composeMontage, cutoutMask, cutoutModelPath, cutoutProduct, montageLayout, refineAlpha, STUDIO_BACKGROUND, studioFromCutout } from "./studio-cutout";
 
 // Photo « amateur » synthétique : produit (flacon bleu + étiquette avec texte) sur un fond beige dégradé.
 async function fakeProductPhoto(): Promise<Buffer> {
@@ -55,6 +55,28 @@ describe.skipIf(!existsSync(cutoutModelPath()))("détourage fond studio", () => 
 
     // Coin = fond studio uniforme (l'ancien fond beige a disparu).
     expect([...out.data.subarray(0, 3)]).toEqual([STUDIO_BACKGROUND.r, STUDIO_BACKGROUND.g, STUDIO_BACKGROUND.b]);
+  });
+
+  it.each(["studio", "table"] as const)("montage « %s » : produit posé à l'identique sur le décor", async (style) => {
+    const photo = await fakeProductPhoto();
+    const cut = await cutoutProduct(photo);
+    const product = await sharp(cut.png).raw().toBuffer({ resolveWithObject: true }); // RGBA, pixels d'origine
+    const montage = await sharp(await composeMontage(cut, style)).raw().toBuffer({ resolveWithObject: true });
+    const { side, left, top } = montageLayout(cut, style);
+    expect(montage.info.width).toBe(side);
+    let compared = 0;
+    let different = 0;
+    for (let y = 0; y < cut.height; y++) {
+      for (let x = 0; x < cut.width; x++) {
+        const i = (y * cut.width + x) * 4;
+        if (product.data[i + 3] !== 255) continue; // bords fondus : non comparés
+        compared++;
+        const j = ((top + y) * side + (left + x)) * montage.info.channels;
+        if (product.data[i] !== montage.data[j] || product.data[i + 1] !== montage.data[j + 1] || product.data[i + 2] !== montage.data[j + 2]) different++;
+      }
+    }
+    expect(compared).toBeGreaterThan(100_000);
+    expect(different).toBe(0);
   });
 
   it("refuse une photo sans produit (image unie)", async () => {

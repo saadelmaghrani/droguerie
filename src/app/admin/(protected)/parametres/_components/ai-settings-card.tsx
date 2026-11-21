@@ -2,7 +2,7 @@
 // dernière erreur de compte (crédit épuisé…) et bouton de test. Composant serveur.
 import { CircleCheck, CircleX, TriangleAlert } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { aiModel, isAiConfigured } from "@/server/ai/client";
+import { aiModel, aiMonthlyBudgetUsd, isAiConfigured } from "@/server/ai/client";
 import { AI_MESSAGES } from "@/server/ai/errors";
 import { getAiUsageSummary } from "@/server/ai/product-text";
 import { AiTestButton } from "./ai-test-button";
@@ -13,6 +13,8 @@ const date = new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "
 export async function AiSettingsCard() {
   const configured = isAiConfigured();
   const usage = await getAiUsageSummary(configured);
+  const budget = aiMonthlyBudgetUsd();
+  const budgetUsed = budget > 0 ? Math.min(100, Math.round((usage.monthCostUsd / budget) * 100)) : 100;
 
   return (
     <Card id="ia" className="scroll-mt-20">
@@ -51,7 +53,12 @@ export async function AiSettingsCard() {
             </div>
             <div className="rounded-lg bg-muted/50 p-3">
               <dt className="text-xs text-muted-foreground">Coût estimé ce mois-ci</dt>
-              <dd className="text-lg font-semibold tabular-nums">{usd.format(usage.monthCostUsd)}</dd>
+              <dd className="text-lg font-semibold tabular-nums">
+                {usd.format(usage.monthCostUsd)} <span className="text-sm font-normal text-muted-foreground">/ {usd.format(budget)}</span>
+              </dd>
+              <dd className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted" aria-label={`Plafond utilisé à ${budgetUsed} %`}>
+                <div className={budgetUsed >= 90 ? "h-full bg-amber-500" : "h-full bg-emerald-500"} style={{ width: `${budgetUsed}%` }} />
+              </dd>
             </div>
           </dl>
         )}
@@ -71,7 +78,11 @@ export async function AiSettingsCard() {
               C&apos;est un compte différent de l&apos;abonnement ChatGPT (Plus, Pro…), qui ne fonctionne pas pour un site web.
             </li>
             <li>Paiement à l&apos;utilisation : on ajoute du crédit (Billing) et chaque proposition coûte quelques centimes.</li>
-            <li>Conseil : fixez un plafond mensuel dans Billing › Limits pour éviter toute surprise.</li>
+            <li>
+              Double sécurité : le site s&apos;arrête de lui-même au plafond mensuel ci-dessus (AI_MONTHLY_BUDGET_USD dans le .env,
+              10 $ par défaut). Fixez aussi un plafond dans Billing › Limits du compte OpenAI.
+            </li>
+            <li>Ordre de grandeur : nom + description ≈ 0,001 $ par produit ; mises en scène IA (option) ≈ 0,10 $ par produit. Photos fond blanc et montages : gratuits.</li>
             <li>Le coût affiché ici est une estimation ; le montant exact est sur le tableau de bord OpenAI.</li>
             <li>La clé API se met dans le fichier <code>.env</code> du serveur (OPENAI_API_KEY). Elle n&apos;est jamais envoyée au navigateur.</li>
           </ul>

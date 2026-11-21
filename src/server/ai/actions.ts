@@ -8,12 +8,12 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/server/auth/dal";
 import { readUploadedFile } from "@/server/media/images";
-import { attachDraftToProduct, createProductDraft, discardDraft, type DraftResult } from "./draft-service";
+import { attachDraftToProduct, createProductDraft, discardDraft, EXTRA_SLOTS, MAX_EXTRAS, type DraftResult } from "./draft-service";
 import { testAiConnection } from "./product-text";
 
 const uuid = z.uuid();
 
-/** Un seul clic : photo fond blanc + 2 mises en scène + nom/description. Rien n'est enregistré sur un produit. */
+/** Un seul clic : fond blanc + 2 montages locaux + nom/description (+ 2 mises en scène IA si demandées). Rien n'est enregistré sur un produit. */
 export async function generateProductDraftAction(formData: FormData): Promise<DraftResult> {
   const admin = await requireAdmin();
   if (!(formData instanceof FormData)) return { ok: false, message: "Requête invalide." };
@@ -24,12 +24,18 @@ export async function generateProductDraftAction(formData: FormData): Promise<Dr
   const category = uuid.safeParse(categoryId).success
     ? await prisma.category.findUnique({ where: { id: categoryId }, select: { name: true } })
     : null;
-  return createProductDraft(upload.file, { name, description: "", brand: "", reference: "", categoryName: category?.name ?? "" }, admin.id);
+  const aiScenes = formData.get("aiScenes") === "on";
+  return createProductDraft(
+    upload.file,
+    { name, description: "", brand: "", reference: "", categoryName: category?.name ?? "" },
+    admin.id,
+    { aiScenes },
+  );
 }
 
 const choiceSchema = z.object({
   main: z.enum(["studio", "original"]),
-  keepScenes: z.array(z.boolean()).max(2),
+  keep: z.array(z.enum(EXTRA_SLOTS)).max(MAX_EXTRAS),
 });
 
 /** Après « Créer le produit » : rattache les photos choisies par l'admin. */

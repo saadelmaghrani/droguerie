@@ -59,7 +59,7 @@ export async function sceneFromOpenAi(
       image: await toFile(input, "produit.png", { type: "image/png" }),
       prompt: SCENE_PROMPTS[index],
       size: "1024x1024",
-      quality: "high",
+      quality: "medium", // ≈ 4 fois moins cher que « high », suffisant pour une vignette catalogue
       background: "opaque",
       output_format: "png",
     },

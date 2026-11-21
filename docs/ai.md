@@ -4,40 +4,57 @@ L'IA n'est proposée **qu'à l'ajout d'un produit** (`/admin/produits/nouveau`),
 **« Générer avec l'IA »**. La fiche de modification n'a aucun assistant IA (seul le bouton
 « Revenir à la photo d'origine » reste, pour annuler un fond blanc).
 
-## Parcours
+## Parcours (option B « hybride économique »)
 
 1. L'admin choisit **une photo** du produit, puis clique sur **Générer avec l'IA**.
-2. Le serveur enregistre la photo puis lance **en parallèle** :
+   Case facultative **« Ajouter 2 mises en scène IA réalistes »**, **décochée par défaut** (produits phares).
+2. Le serveur enregistre la photo, la **détoure une seule fois**, puis prépare en parallèle :
 
 | Résultat | Technique | Fidélité | Coût |
 |---|---|---|---|
-| Photo principale **fond blanc** | Détourage local (modèle ISNet) + pose à l'échelle 1:1 sur `#FFFFFF`, ombre douce | **Pixels du produit identiques** (test automatique : 0 pixel différent) | Gratuit |
-| **2 mises en scène** | OpenAI `images.edit` : même face visible, autre décor (table bois / fond dégradé studio) | **Redessinées** : texte, logo ou forme peuvent varier malgré la consigne stricte | Payant |
-| **Nom + description** | OpenAI (lecture de la photo, Structured Outputs) : français, sans prix ni caractéristique inventée | Texte à relire | Payant |
+| Photo principale **fond blanc** | Détourage local (ISNet) + pose à l'échelle 1:1 sur `#FFFFFF`, ombre douce | **Pixels du produit identiques** (testé) | Gratuit |
+| **2 montages** : « studio dégradé avec reflet », « table en bois clair » | Même produit détouré posé sur un décor **dessiné par le code** (dégradés, veinage procédural) : aucune image tierce, aucun droit d'auteur | **Pixels identiques** (testé pour chaque décor) | Gratuit |
+| **Nom + description** | Petit modèle OpenAI « vision » (`gpt-6-luna` par défaut), Structured Outputs | Texte à relire | ≈ 0,001 $ |
+| *Option* : **2 mises en scène IA** | OpenAI `images.edit`, qualité « medium », même face visible | **Redessinées** : texte/logo peuvent varier | ≈ 0,05 $ chacune |
 
-   Chaque partie peut échouer seule (crédit épuisé, pas de clé…) : les autres restent utilisables.
-   Sans clé OpenAI, seule la photo fond blanc est générée.
+   Durée : quelques secondes (≈ une minute avec l'option IA). Chaque partie peut échouer seule.
+   Sans clé OpenAI : photos (fond blanc + montages) seulement.
 3. **Aperçu complet avant enregistrement** :
    - photo principale : **Fond blanc** (par défaut) ou **Photo d'origine** ;
-   - mises en scène : case **« Garder cette photo »**, **décochée par défaut** + avertissement ;
+   - photos supplémentaires : montages **cochés par défaut** (badge « Produit d'origine ») ; mises en scène IA
+     **décochées** (badge « Générée par l'IA » + avertissement). **2 au maximum** (3 photos par produit) ;
    - nom et description recopiés dans le formulaire, **modifiables**.
-4. **Créer le produit** : le produit est créé, puis **seules les photos choisies** lui sont rattachées.
-   Les fichiers non retenus sont supprimés. Avec le fond blanc, l'**originale est conservée**
-   (`original_storage_key`) : bouton « Revenir à la photo d'origine » sur la fiche.
+4. **Créer le produit** : seules les photos choisies sont rattachées, le reste est supprimé.
+   Avec le fond blanc, l'**originale est conservée** : bouton « Revenir à la photo d'origine » sur la fiche.
+
+### Limites du détourage (constatées sur des photos réelles)
+
+- Partie du produit **de même couleur que le fond** (flacon jaune sur fond jaune) : elle peut disparaître.
+- Petits éléments colorés près d'un fond chargé (bouchon) : peuvent être coupés.
+- Photos prises **du dessus** (pinceau posé à plat) : les montages « posés » paraissent peu naturels.
+- Conseil photo : produit **debout, de face**, sur un fond uni **contrasté** (mur clair pour un produit foncé, et inversement).
+  En cas de défaut : choisir « Photo d'origine » et décocher les montages.
+
+### Budget
+
+- `AI_MONTHLY_BUDGET_USD` (10 $ par défaut) : le site **refuse lui-même** tout appel payant qui dépasserait le
+  plafond du mois (message « Plafond mensuel des dépenses IA du site atteint »). Les photos locales continuent.
+- Paramètres › IA : coût estimé du mois / plafond, avec jauge.
+- Recommandé en plus : plafond sur le compte OpenAI (Billing › Limits).
 
 Pourquoi pas « d'autres angles » : générer une vue de côté ou de dos obligerait l'IA à **inventer** des
-faces jamais photographiées (étiquette arrière, forme). Les mises en scène gardent la face visible.
+faces jamais photographiées. Les montages et mises en scène gardent la face visible.
 
 ## Données
 
 - `product_drafts` : la photo envoyée, en attente. `consumed_at` renseigné à la création du produit.
   Brouillon abandonné (page quittée, « Recommencer ») : fichiers supprimés ; automatiquement après 24 h.
-- `ai_generations` : une ligne par partie (`IMAGE_STUDIO`, `IMAGE_SCENE` ×2, `TEXT`), liée au brouillon
+- `ai_generations` : une ligne par partie (`IMAGE_STUDIO` : fond blanc et montages, `IMAGE_SCENE` : mises en scène IA, `TEXT`), liée au brouillon
   (`draft_id`) puis au produit. Statut PENDING → ACCEPTED / REJECTED, ou FAILED avec la cause.
   Jetons et coût estimé conservés.
-- `product_images.source` : `AI_STUDIO` (fond blanc), `AI_GENERATED` (mise en scène, badge « Générée par l'IA »).
+- `product_images.source` : `AI_STUDIO` (fond blanc ou montage : produit d'origine), `AI_GENERATED` (mise en scène IA, badge « Générée par l'IA »).
 - Le serveur ne fait jamais confiance aux clés de fichiers envoyées par le navigateur : il ne reçoit que
-  l'identifiant du brouillon et les choix (fond blanc / origine, cases cochées).
+  l'identifiant du brouillon et les choix (fond blanc / origine, emplacements cochés, 2 au maximum).
 
 ## Compte OpenAI et facturation (à expliquer au client)
 
@@ -53,8 +70,9 @@ faces jamais photographiées (étiquette arrière, forme). Les mises en scène g
 | Variable | Rôle |
 |---|---|
 | `OPENAI_API_KEY` | Clé secrète. Vide = parties OpenAI désactivées. Jamais préfixée `NEXT_PUBLIC_` |
-| `OPENAI_MODEL` | Modèle texte + lecture de photo (défaut `gpt-6.2-sol`) |
-| `OPENAI_IMAGE_MODEL` | Modèle des mises en scène (défaut `gpt-image-2.5-sunburst`) |
+| `OPENAI_MODEL` | Modèle texte + lecture de photo (défaut `gpt-6-luna`, le plus économique) |
+| `OPENAI_IMAGE_MODEL` | Modèle des mises en scène IA optionnelles (défaut `gpt-image-2.5-sunburst`) |
+| `AI_MONTHLY_BUDGET_USD` | Plafond mensuel des dépenses IA du site (défaut 10) |
 | `MODELS_DIR` | Dossier du modèle de détourage (défaut `./storage/models`) |
 | `OPENAI_BASE_URL` | Tests uniquement (faux serveur OpenAI) |
 
@@ -83,6 +101,7 @@ Modèle de détourage : `npm run ai:model` une fois par machine **et sur le serv
 | Pas d'internet | connexion | « Impossible de joindre OpenAI » |
 | Détourage non installé | — | « Lancez npm run ai:model » |
 | Aucun produit net sur la photo | — | « Aucun produit net n'a été détecté… » |
+| Plafond du site atteint | — | « Plafond mensuel des dépenses IA du site atteint… » |
 
 ## Code
 
@@ -91,8 +110,9 @@ Modèle de détourage : `npm run ai:model` une fois par machine **et sur le serv
 | `src/server/ai/client.ts` | Clé, modèle, client OpenAI (serveur uniquement) |
 | `src/server/ai/errors.ts` | Erreurs → messages en français (testé) |
 | `src/server/ai/draft-service.ts` | Brouillon : génération parallèle, rattachement des choix, nettoyage |
-| `src/server/ai/studio-cutout.ts` | Détourage + fond blanc (testé : pixels identiques, photo vide refusée) |
-| `src/server/ai/scenes-openai.ts` | 2 mises en scène OpenAI, consigne stricte |
+| `src/server/ai/studio-cutout.ts` | Détourage, fond blanc, montages studio / table (testé : pixels identiques, photo vide refusée) |
+| `src/server/ai/scenes-openai.ts` | Option : 2 mises en scène OpenAI, consigne stricte |
+| `src/server/ai/budget.ts` | Plafond mensuel du site |
 | `src/server/ai/product-text.ts`, `product-text-prompt.ts` | Nom + description (testé), test de connexion, résumé du mois |
 | `src/server/ai/actions.ts` | Actions serveur (`requireAdmin()` en premier) |
 | `src/app/admin/(protected)/produits/_components/new-product-ai.tsx` | Carte « Générer avec l'IA » |
