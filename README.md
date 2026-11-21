@@ -64,6 +64,7 @@ Arrêter toujours le serveur avec `Ctrl + C` plutôt que de fermer brutalement l
 | [`docs/authentication.md`](docs/authentication.md) | Sessions admin, sécurité, règles à respecter |
 | [`docs/admin-ui.md`](docs/admin-ui.md) | Interface admin : structure, ajouter une page, thème |
 | [`docs/whatsapp.md`](docs/whatsapp.md) | Numéros WhatsApp : formats acceptés, règles métier |
+| [`docs/categories.md`](docs/categories.md) | Catégories : champs, règles métier |
 
 ## Variables d'environnement
 
