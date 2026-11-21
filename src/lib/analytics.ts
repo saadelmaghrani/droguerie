@@ -6,6 +6,8 @@
 //    et le sel change chaque jour (on ne peut pas suivre une personne d'un jour à l'autre) ;
 //  - la provenance (referrer) est réduite au nom du site (google.com), jamais l'adresse complète.
 
+import { MOROCCO_TZ } from "./timezone";
+
 const BOT_PATTERN =
   /bot|crawl|spider|slurp|bingpreview|facebookexternalhit|whatsapp|telegram|preview|headless|lighthouse|pagespeed|curl|wget|python|axios|node-fetch|go-http|java\//i;
 
@@ -58,7 +60,7 @@ export const SESSION_GAP_MS = 30 * 60 * 1000;
 
 /** Date du jour au Maroc (AAAA-MM-JJ), pour le sel quotidien et les regroupements. */
 export function moroccoDay(date: Date): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Casablanca", year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
+  return new Intl.DateTimeFormat("en-CA", { timeZone: MOROCCO_TZ, year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
 }
 
 /** Variation en % par rapport à la période précédente (null si pas de base de comparaison). */

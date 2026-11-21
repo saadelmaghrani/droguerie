@@ -52,3 +52,10 @@ Vérifié : valeurs (avec et sans filtre catégorie) identiques à un contrôle 
 | `src/app/admin/(protected)/statistiques/` | Page, filtres, indicateurs, courbe, anneaux (`donut-card.tsx`, testé), classements |
 
 Vérifié : chiffres identiques à un contrôle SQL indépendant sur 90 jours de données simulées.
+
+## Fuseau horaire (important)
+
+Les jours et périodes sont calculés à l'heure du Maroc **par Node.js** (`src/lib/timezone.ts`, testé, Ramadan
+compris), pas par PostgreSQL : l'image `postgres:18-alpine` contient des données de fuseau fausses pour le
+Maroc (UTC+0 au lieu de UTC+1, constaté le 21/11/2026). Ne pas utiliser `AT TIME ZONE 'Africa/Casablanca'`
+dans les requêtes : `stats.ts` envoie des bornes UTC et des décalages explicites (`dayWindow`).
