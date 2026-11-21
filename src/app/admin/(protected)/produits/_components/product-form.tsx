@@ -26,6 +26,7 @@ import { PRODUCT_STATUSES, STATUS_INFO, type ProductStatusValue } from "@/lib/pr
 import { slugify } from "@/lib/slug";
 import { removeProduct, saveProduct, type ProductFormState, type ProductFormValues } from "@/server/products/actions";
 import { uploadProductImage } from "@/server/products/image-actions";
+import { AiAssistant } from "./ai-assistant";
 import { PendingImages, type PendingImage } from "./pending-images";
 import { ProductImages, type ProductImage } from "./product-images";
 
@@ -42,7 +43,15 @@ function FieldError({ id, message }: { id: string; message?: string }) {
   );
 }
 
-export function ProductForm({ product, categories }: { product: EditableProduct | null; categories: CategoryOption[] }) {
+export function ProductForm({
+  product,
+  categories,
+  aiConfigured = false,
+}: {
+  product: EditableProduct | null;
+  categories: CategoryOption[];
+  aiConfigured?: boolean;
+}) {
   const router = useRouter();
   const [state, formAction, pending] = useActionState<ProductFormState, FormData>(saveProduct, undefined);
   const initial: ProductFormValues = product ? {
@@ -126,6 +135,21 @@ export function ProductForm({ product, categories }: { product: EditableProduct 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         {/* Colonne principale : contenu de la fiche */}
         <div className="grid content-start gap-6">
+          {product && (
+            <AiAssistant
+              productId={product.id}
+              configured={aiConfigured}
+              hasPhoto={product.imageCount > 0}
+              hints={{
+                name: values.name,
+                description: values.description,
+                brand: values.brand,
+                reference: values.reference,
+                categoryId: values.categoryId,
+              }}
+              onApply={({ name, description }) => setValues((v) => ({ ...v, name, description }))}
+            />
+          )}
           <Card>
             <CardHeader>
               <CardTitle>Informations</CardTitle>

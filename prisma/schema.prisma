@@ -247,7 +247,7 @@ model AiGeneration {
   product          Product?           @relation(fields: [productId], references: [id], onDelete: SetNull)
   adminUserId      String?            @map("admin_user_id") @db.Uuid
   adminUser        AdminUser?         @relation(fields: [adminUserId], references: [id], onDelete: SetNull)
-  inputImageKey    String             @map("input_image_key")
+  inputImageKey    String?            @map("input_image_key") // photo envoyée à l'IA (null : texte seul)
   output           Json? // { name, description } ou { imageKey }
   provider         String
   model            String?

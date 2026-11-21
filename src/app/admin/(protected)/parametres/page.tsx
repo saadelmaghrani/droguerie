@@ -4,6 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { requireAdmin } from "@/server/auth/dal";
 import { getStoreSettings, toFormValues } from "@/server/settings/service";
 import { PageHeader } from "../_components/page-header";
+import { AiSettingsCard } from "./_components/ai-settings-card";
 import { SettingsForm } from "./_components/settings-form";
 
 export const metadata: Metadata = { title: "Paramètres" };
@@ -11,7 +12,12 @@ export const metadata: Metadata = { title: "Paramètres" };
 async function SettingsContent() {
   await requireAdmin(); // 1. vérification de la session, AVANT la lecture des données
   const settings = await getStoreSettings();
-  return <SettingsForm initial={toFormValues(settings)} logoKey={settings.logoKey} heroImageKey={settings.heroImageKey} />;
+  return (
+    <div className="grid gap-6">
+      <AiSettingsCard />
+      <SettingsForm initial={toFormValues(settings)} logoKey={settings.logoKey} heroImageKey={settings.heroImageKey} />
+    </div>
+  );
 }
 
 function SettingsSkeleton() {
