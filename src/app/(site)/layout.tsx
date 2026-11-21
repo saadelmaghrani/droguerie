@@ -7,12 +7,15 @@ import { Suspense, type CSSProperties } from "react";
 import { SiteFooter } from "@/components/site/site-footer";
 import { SiteHeader } from "@/components/site/site-header";
 import { readableTextColor } from "@/lib/color";
+import { siteUrl } from "@/lib/site-url";
 import { getPublicCategories, getPublicSettings } from "@/server/catalogue/queries";
 
 export async function generateMetadata(): Promise<Metadata> {
   await connection();
   const s = await getPublicSettings();
   return {
+    // Adresse de base : rend absolues les images de partage (Facebook, WhatsApp…).
+    metadataBase: siteUrl() ?? undefined,
     title: { default: s.seoTitle ?? s.storeName, template: `%s · ${s.storeName}` },
     description: s.seoDescription ?? `Catalogue de ${s.storeName} : demandez le prix sur WhatsApp.`,
     openGraph: { siteName: s.storeName, locale: "fr_MA", type: "website" },

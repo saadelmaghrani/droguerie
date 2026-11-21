@@ -9,6 +9,8 @@ import { cacheLife, cacheTag } from "next/cache";
 import { Prisma } from "@/generated/prisma/client";
 import { DEFAULT_PRIMARY_COLOR } from "@/lib/color";
 import { prisma } from "@/lib/prisma";
+import { pickWhatsappPhone } from "@/lib/product-visibility";
+import type { ProductDetailData } from "@/server/products/preview";
 import type { SocialLinks } from "@/server/settings/service";
 import { CATALOGUE_TAG } from "./cache";
 
@@ -227,4 +229,63 @@ export async function searchCatalogue(query: CatalogueQuery): Promise<CatalogueR
     page: query.page,
     pageCount: Math.max(1, Math.ceil(total / CATALOGUE_PAGE_SIZE)),
   };
+}
+
+/* ───────────────────────────── Fiche produit ───────────────────────────── */
+
+export type PublicProduct = ProductDetailData & { categoryId: string; updatedAt: Date };
+
+/** Produit visible par son adresse, ou null (inconnu, brouillon, masqué, catégorie masquée). */
+export async function getPublicProduct(slug: string): Promise<PublicProduct | null> {
+  "use cache";
+  cached();
+  const product = await prisma.product.findFirst({
+    where: { slug, ...visibleWhere },
+    include: {
+      category: { select: { id: true, name: true, slug: true, isActive: true, whatsappNumber: { select: { phone: true, isActive: true } } } },
+      images: { orderBy: { position: "asc" }, select: { id: true, storageKey: true, width: true, height: true } },
+    },
+  });
+  if (!product) return null;
+  const defaultNumber = await prisma.whatsappNumber.findFirst({ where: { isDefault: true }, select: { phone: true, isActive: true } });
+  const { whatsappNumber, id: categoryId, ...category } = product.category;
+  return {
+    id: product.id,
+    name: product.name,
+    slug: product.slug,
+    description: product.description,
+    reference: product.reference,
+    brand: product.brand,
+    status: product.status,
+    category,
+    categoryId,
+    images: product.images,
+    whatsappPhone: pickWhatsappPhone(whatsappNumber, defaultNumber),
+    updatedAt: product.updatedAt,
+  };
+}
+
+/** Autres produits de la même catégorie (mis en avant puis récents). */
+export async function getRelatedProducts(categoryId: string, excludeId: string, limit = 4): Promise<ProductCardData[]> {
+  "use cache";
+  cached();
+  const rows = await prisma.product.findMany({
+    where: { ...visibleWhere, categoryId, id: { not: excludeId } },
+    orderBy: [{ isFeatured: "desc" }, { publishedAt: { sort: "desc", nulls: "last" } }],
+    take: limit,
+    select: cardSelect,
+  });
+  return rows.map(toCard);
+}
+
+/* ───────────────────────────── Plan du site (sitemap) ───────────────────────────── */
+
+export async function getSitemapEntries(): Promise<{ products: { slug: string; updatedAt: Date }[]; categories: string[] }> {
+  "use cache";
+  cached();
+  const [products, categories] = await Promise.all([
+    prisma.product.findMany({ where: visibleWhere, select: { slug: true, updatedAt: true }, orderBy: { updatedAt: "desc" } }),
+    getPublicCategories(),
+  ]);
+  return { products, categories: categories.map((c) => c.slug) };
 }

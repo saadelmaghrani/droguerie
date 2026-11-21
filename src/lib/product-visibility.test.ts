@@ -28,6 +28,11 @@ describe("productWhatsappMessage", () => {
   it("ajoute la référence si elle existe", () => {
     expect(productWhatsappMessage("Éponge x10", " EP-10 ")).toMatch(/Éponge x10 \(réf\. EP-10\)$/);
   });
+  it("ajoute le lien de la fiche sur une nouvelle ligne", () => {
+    expect(productWhatsappMessage("Éponge x10", "EP-10", "https://exemple.ma/produits/eponge-x10")).toBe(
+      "Bonjour, je souhaite connaître le prix et la disponibilité de : Éponge x10 (réf. EP-10)\nhttps://exemple.ma/produits/eponge-x10",
+    );
+  });
   it("ignore une référence vide", () => {
     expect(productWhatsappMessage("Éponge x10", "  ")).not.toContain("réf.");
   });

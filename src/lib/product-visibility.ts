@@ -16,10 +16,14 @@ export function pickWhatsappPhone(categoryNumber: WhatsappCandidate, defaultNumb
   return null;
 }
 
-/** Message prérempli envoyé au magasin depuis la fiche produit. */
-export function productWhatsappMessage(productName: string, reference?: string | null): string {
+/**
+ * Message prérempli envoyé au magasin depuis la fiche produit.
+ * Le lien de la fiche (si l'adresse du site est connue) permet au vendeur d'identifier le produit exact.
+ */
+export function productWhatsappMessage(productName: string, reference?: string | null, productUrl?: string | null): string {
   const ref = reference?.trim() ? ` (réf. ${reference.trim()})` : "";
-  return `Bonjour, je souhaite connaître le prix et la disponibilité de : ${productName}${ref}`;
+  const link = productUrl ? `\n${productUrl}` : "";
+  return `Bonjour, je souhaite connaître le prix et la disponibilité de : ${productName}${ref}${link}`;
 }
 
 export type VisibilityIssue = {

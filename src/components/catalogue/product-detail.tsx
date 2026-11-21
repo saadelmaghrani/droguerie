@@ -5,18 +5,23 @@ import { ChevronRight } from "lucide-react";
 import { whatsappUrl } from "@/lib/phone";
 import { productWhatsappMessage } from "@/lib/product-visibility";
 import type { ProductDetailData } from "@/server/products/preview";
+import { WhatsappIcon } from "@/components/site/whatsapp-icon";
 import { ProductGallery } from "./product-gallery";
 
-function WhatsappIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden className={className}>
-      <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38a9.9 9.9 0 0 0 4.74 1.21h.01c5.46 0 9.9-4.45 9.9-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2Zm5.8 14.03c-.24.68-1.42 1.3-1.95 1.34-.5.05-.97.23-3.27-.68-2.77-1.09-4.52-3.92-4.66-4.1-.13-.18-1.11-1.48-1.11-2.82 0-1.34.7-2 .95-2.28.25-.27.54-.34.72-.34l.52.01c.17 0 .39-.06.61.47.23.54.77 1.88.84 2.02.07.13.11.29.02.47-.09.18-.13.29-.27.45l-.4.47c-.13.13-.27.28-.12.55.16.27.7 1.15 1.5 1.86 1.03.92 1.9 1.2 2.17 1.34.27.13.43.11.58-.07.16-.18.68-.79.86-1.06.18-.27.36-.23.61-.14.25.09 1.58.75 1.85.88.27.14.45.2.52.32.07.11.07.66-.17 1.33Z" />
-    </svg>
-  );
-}
-
-export function ProductDetail({ product, preview = false }: { product: ProductDetailData; preview?: boolean }) {
+export function ProductDetail({
+  product,
+  preview = false,
+  productUrl = null,
+}: {
+  product: ProductDetailData;
+  preview?: boolean;
+  /** Adresse complète de la fiche, ajoutée au message WhatsApp (null si SITE_URL n'est pas configurée). */
+  productUrl?: string | null;
+}) {
   // Dans l'aperçu, les pages catégorie / accueil du site n'existent pas forcément : pas de liens.
+  const waHref = product.whatsappPhone
+    ? whatsappUrl(product.whatsappPhone, productWhatsappMessage(product.name, product.reference, productUrl))
+    : null;
   const crumb = (href: string, label: string) =>
     preview ? <span>{label}</span> : <Link href={href} className="hover:text-slate-900 hover:underline">{label}</Link>;
 
@@ -46,7 +51,7 @@ export function ProductDetail({ product, preview = false }: { product: ProductDe
             </p>
             {product.whatsappPhone ? (
               <a
-                href={whatsappUrl(product.whatsappPhone, productWhatsappMessage(product.name, product.reference))}
+                href={waHref!}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#25D366] px-5 py-2 text-center font-semibold text-slate-900 shadow-sm transition hover:bg-[#1ebe5b] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
@@ -67,6 +72,25 @@ export function ProductDetail({ product, preview = false }: { product: ProductDe
           )}
         </div>
       </div>
+
+      {/* Mobile : bouton WhatsApp toujours visible en bas de l'écran (pas dans l'aperçu admin). */}
+      {waHref && !preview && (
+        <>
+          <div className="h-20 lg:hidden" aria-hidden />
+          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur lg:hidden">
+            <a
+              href={waHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-sticky-whatsapp
+              className="flex h-12 items-center justify-center gap-2 rounded-xl bg-[#25D366] px-4 font-semibold text-slate-900 shadow-sm active:bg-[#1ebe5b]"
+            >
+              <WhatsappIcon className="size-5 shrink-0" />
+              <span className="truncate">Demander le prix sur WhatsApp</span>
+            </a>
+          </div>
+        </>
+      )}
     </article>
   );
 }
