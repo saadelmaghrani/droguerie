@@ -32,7 +32,10 @@ Remplacer une image crée une nouvelle clé et supprime les anciens fichiers.
 - Réorganisation par **échange du contenu** de deux emplacements (la base interdit les positions hors 0–2).
 - Suppression : les emplacements suivants sont décalés (la principale existe toujours si une photo reste).
 - Supprimer un produit supprime ses fichiers images du disque.
-- Une nouvelle fiche doit d'abord être créée avant d'ajouter des photos (il faut l'identifiant du produit).
+- Nouvelle fiche : les photos peuvent être choisies avant la création. Elles restent dans le navigateur
+  (`pending-images.tsx`), puis sont envoyées une par une juste après « Créer le produit », dans l'ordre
+  choisi (la 1re devient la principale). Une photo refusée n'empêche pas la création : un message
+  l'indique et elle peut être ajoutée ensuite depuis la fiche.
 
 ## Sécurité
 

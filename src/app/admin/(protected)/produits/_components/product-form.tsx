@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { ArrowLeft, CircleAlert, Eye, ImagePlus, Loader2, Star, Trash2, TriangleAlert } from "lucide-react";
+import { ArrowLeft, CircleAlert, Eye, Loader2, Star, Trash2, TriangleAlert } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -25,6 +25,8 @@ import { submitWithoutReset } from "@/lib/forms";
 import { PRODUCT_STATUSES, STATUS_INFO, type ProductStatusValue } from "@/lib/product-status";
 import { slugify } from "@/lib/slug";
 import { removeProduct, saveProduct, type ProductFormState, type ProductFormValues } from "@/server/products/actions";
+import { uploadProductImage } from "@/server/products/image-actions";
+import { PendingImages, type PendingImage } from "./pending-images";
 import { ProductImages, type ProductImage } from "./product-images";
 
 export type EditableProduct = ProductFormValues & { id: string; imageCount: number; images: ProductImage[] };
@@ -57,6 +59,9 @@ export function ProductForm({ product, categories }: { product: EditableProduct 
     isFeatured: false,
   };
   const [values, setValues] = useState<ProductFormValues>(initial);
+  // Création : photos choisies avant l'enregistrement, envoyées juste après la création du produit.
+  const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
+  const [uploadProgress, setUploadProgress] = useState<string | null>(null);
   const [slugEdited, setSlugEdited] = useState(Boolean(product));
   const set = <K extends keyof ProductFormValues>(key: K, value: ProductFormValues[K]) => setValues((v) => ({ ...v, [key]: value }));
 
@@ -67,8 +72,31 @@ export function ProductForm({ product, categories }: { product: EditableProduct 
       return;
     }
     toast.success(state.message);
-    // Création réussie → on passe sur la page de modification du nouveau produit.
-    if (state.created) router.replace(`/admin/produits/${state.id}`);
+    if (!state.created) return;
+    // Création réussie → envoi des photos choisies, puis page de modification du nouveau produit.
+    const productId = state.id;
+    const files = pendingImages.map((i) => i.file);
+    let cancelled = false;
+    (async () => {
+      for (const [index, file] of files.entries()) {
+        if (cancelled) return;
+        setUploadProgress(`Envoi des photos (${index + 1}/${files.length})…`);
+        const data = new FormData();
+        data.set("file", file);
+        try {
+          const result = await uploadProductImage(productId, data);
+          if (!result.ok) toast.error(`Photo ${index + 1} : ${result.message}`);
+        } catch {
+          toast.error(`Photo ${index + 1} non envoyée. Vous pourrez l'ajouter depuis la fiche.`);
+        }
+      }
+      if (!cancelled) router.replace(`/admin/produits/${productId}`);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // pendingImages volontairement absent : seul un nouveau résultat d'enregistrement déclenche l'envoi.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state, router]);
 
   const failure = state && !state.ok ? state : null;
@@ -187,10 +215,7 @@ export function ProductForm({ product, categories }: { product: EditableProduct 
               {product ? (
                 <ProductImages productId={product.id} productName={product.name} images={product.images} />
               ) : (
-                <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
-                  <ImagePlus className="size-6" aria-hidden />
-                  Créez d&apos;abord le produit : vous pourrez ensuite ajouter jusqu&apos;à 3 photos.
-                </div>
+                <PendingImages images={pendingImages} onChange={setPendingImages} disabled={pending || uploadProgress !== null} />
               )}
             </CardContent>
           </Card>
@@ -234,7 +259,7 @@ export function ProductForm({ product, categories }: { product: EditableProduct 
                   La catégorie « {category.name} » est masquée : ce produit ne sera pas visible tant qu&apos;elle l&apos;est.
                 </p>
               )}
-              {values.status === "PUBLISHED" && (product?.imageCount ?? 0) === 0 && (
+              {values.status === "PUBLISHED" && (product?.imageCount ?? pendingImages.length) === 0 && (
                 <p className="flex items-start gap-1.5 text-sm text-amber-700">
                   <TriangleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden />
                   Ce produit n&apos;a pas encore de photo.
@@ -303,7 +328,7 @@ export function ProductForm({ product, categories }: { product: EditableProduct 
       <div className="sticky bottom-0 z-20 -mx-4 border-t bg-background/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10">
         <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
           <p className="w-full text-sm text-muted-foreground sm:mr-auto sm:w-auto" aria-live="polite">
-            {pending ? "Enregistrement…" : dirty ? "Modifications non enregistrées" : product ? "Tout est enregistré" : "Nouveau produit"}
+            {uploadProgress ?? (pending ? "Enregistrement…" : dirty ? "Modifications non enregistrées" : product ? "Tout est enregistré" : "Nouveau produit")}
           </p>
           <Button variant="outline" asChild>
             <Link href="/admin/produits">
@@ -326,8 +351,8 @@ export function ProductForm({ product, categories }: { product: EditableProduct 
                 </Link>
               </Button>
             ))}
-          <Button type="submit" disabled={pending}>
-            {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
+          <Button type="submit" disabled={pending || uploadProgress !== null}>
+            {(pending || uploadProgress !== null) && <Loader2 className="size-4 animate-spin" aria-hidden />}
             {product ? "Enregistrer" : "Créer le produit"}
           </Button>
         </div>
