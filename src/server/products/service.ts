@@ -5,6 +5,8 @@ import "server-only";
 import { Prisma, type ProductStatus } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { slugify } from "@/lib/slug";
+import { deleteImageFiles } from "@/server/media/images";
+import { productImageKeys } from "./images-service";
 
 export const PRODUCTS_PAGE_SIZE = 20;
 
@@ -23,6 +25,8 @@ export type ProductListRow = {
   isFeatured: boolean;
   category: { id: string; name: string; isActive: boolean };
   imageCount: number;
+  /** Clé de la photo principale (vignette), ou null. */
+  primaryImageKey: string | null;
   updatedAt: string;
 };
 
@@ -103,6 +107,7 @@ export async function listProducts(query: ProductListQuery): Promise<{
         include: {
           category: { select: { id: true, name: true, isActive: true } },
           _count: { select: { images: true } },
+          images: { where: { position: 0 }, select: { storageKey: true } },
         },
       })
     : [];
@@ -122,6 +127,7 @@ export async function listProducts(query: ProductListQuery): Promise<{
         isFeatured: p.isFeatured,
         category: p.category,
         imageCount: p._count.images,
+        primaryImageKey: p.images[0]?.storageKey ?? null,
         updatedAt: p.updatedAt.toISOString(),
       }];
     }),
@@ -147,7 +153,10 @@ export async function listCategoryOptions() {
 export async function getProduct(id: string) {
   return prisma.product.findUnique({
     where: { id },
-    include: { _count: { select: { images: true } } },
+    include: {
+      _count: { select: { images: true } },
+      images: { orderBy: { position: "asc" }, select: { id: true, position: true, storageKey: true, width: true, height: true } },
+    },
   });
 }
 
@@ -263,10 +272,12 @@ export async function setProductFeatured(id: string, isFeatured: boolean): Promi
 
 export async function deleteProduct(id: string): Promise<ServiceResult> {
   try {
-    // Les photos sont supprimées avec le produit (ON DELETE CASCADE) ; les statistiques
-    // sont conservées sans lien (ON DELETE SET NULL). Les fichiers images seront aussi
-    // supprimés du disque quand l'envoi d'images existera (tâche 11).
+    // Les lignes photos sont supprimées avec le produit (ON DELETE CASCADE) ; les statistiques
+    // sont conservées sans lien (ON DELETE SET NULL). Les FICHIERS sont supprimés ensuite,
+    // une fois la suppression en base confirmée.
+    const keys = await productImageKeys(id);
     const product = await prisma.product.delete({ where: { id } });
+    await Promise.all(keys.map((key) => deleteImageFiles(key, "product")));
     return { ok: true, message: `Produit « ${product.name} » supprimé.` };
   } catch (error) {
     if (prismaCode(error) === "P2025") return NOT_FOUND;

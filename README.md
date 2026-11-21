@@ -66,6 +66,7 @@ Arrêter toujours le serveur avec `Ctrl + C` plutôt que de fermer brutalement l
 | [`docs/whatsapp.md`](docs/whatsapp.md) | Numéros WhatsApp : formats acceptés, règles métier |
 | [`docs/categories.md`](docs/categories.md) | Catégories : champs, règles métier |
 | [`docs/products.md`](docs/products.md) | Produits : recherche, filtres, règles de la fiche |
+| [`docs/images.md`](docs/images.md) | Images : traitement, tailles, sécurité, stockage |
 | [`docs/settings.md`](docs/settings.md) | Paramètres du magasin : champs, sécurité des liens |
 
 ## Variables d'environnement

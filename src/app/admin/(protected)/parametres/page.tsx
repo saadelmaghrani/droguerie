@@ -11,7 +11,7 @@ export const metadata: Metadata = { title: "Paramètres" };
 async function SettingsContent() {
   await requireAdmin(); // 1. vérification de la session, AVANT la lecture des données
   const settings = await getStoreSettings();
-  return <SettingsForm initial={toFormValues(settings)} />;
+  return <SettingsForm initial={toFormValues(settings)} logoKey={settings.logoKey} heroImageKey={settings.heroImageKey} />;
 }
 
 function SettingsSkeleton() {

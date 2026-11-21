@@ -43,6 +43,7 @@ async function EditProductContent({ params }: { params: Promise<{ id: string }> 
           status: product.status,
           isFeatured: product.isFeatured,
           imageCount: product._count.images,
+          images: product.images,
         }}
         categories={categories}
       />

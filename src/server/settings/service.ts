@@ -36,7 +36,7 @@ export type StoreSettingsFormValues = {
 const SINGLETON_ID = 1;
 
 /** Lit les paramètres ; crée la ligne avec des valeurs neutres si elle n'existe pas encore. */
-export async function getStoreSettings(): Promise<StoreSettingsData & { updatedAt: Date }> {
+export async function getStoreSettings(): Promise<StoreSettingsData & { updatedAt: Date; logoKey: string | null; heroImageKey: string | null }> {
   const row = await prisma.storeSettings.upsert({
     where: { id: SINGLETON_ID },
     update: {},
@@ -61,6 +61,8 @@ export async function getStoreSettings(): Promise<StoreSettingsData & { updatedA
     showFeatured: row.showFeatured,
     showNewArrivals: row.showNewArrivals,
     updatedAt: row.updatedAt,
+    logoKey: row.logoKey,
+    heroImageKey: row.heroImageKey,
   };
 }
 

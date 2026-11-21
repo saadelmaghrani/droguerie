@@ -25,8 +25,9 @@ import { submitWithoutReset } from "@/lib/forms";
 import { PRODUCT_STATUSES, STATUS_INFO, type ProductStatusValue } from "@/lib/product-status";
 import { slugify } from "@/lib/slug";
 import { removeProduct, saveProduct, type ProductFormState, type ProductFormValues } from "@/server/products/actions";
+import { ProductImages, type ProductImage } from "./product-images";
 
-export type EditableProduct = ProductFormValues & { id: string; imageCount: number };
+export type EditableProduct = ProductFormValues & { id: string; imageCount: number; images: ProductImage[] };
 type CategoryOption = { id: string; name: string; isActive: boolean };
 
 function FieldError({ id, message }: { id: string; message?: string }) {
@@ -42,7 +43,10 @@ function FieldError({ id, message }: { id: string; message?: string }) {
 export function ProductForm({ product, categories }: { product: EditableProduct | null; categories: CategoryOption[] }) {
   const router = useRouter();
   const [state, formAction, pending] = useActionState<ProductFormState, FormData>(saveProduct, undefined);
-  const initial: ProductFormValues = product ?? {
+  const initial: ProductFormValues = product ? {
+    name: product.name, slug: product.slug, description: product.description, reference: product.reference,
+    brand: product.brand, categoryId: product.categoryId, status: product.status, isFeatured: product.isFeatured,
+  } : {
     name: "",
     slug: "",
     description: "",
@@ -180,10 +184,14 @@ export function ProductForm({ product, categories }: { product: EditableProduct 
               <CardTitle>Photos</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
-                <ImagePlus className="size-6" aria-hidden />
-                Jusqu&apos;à 3 photos par produit : l&apos;envoi des photos arrive à la prochaine tâche.
-              </div>
+              {product ? (
+                <ProductImages productId={product.id} productName={product.name} images={product.images} />
+              ) : (
+                <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
+                  <ImagePlus className="size-6" aria-hidden />
+                  Créez d&apos;abord le produit : vous pourrez ensuite ajouter jusqu&apos;à 3 photos.
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

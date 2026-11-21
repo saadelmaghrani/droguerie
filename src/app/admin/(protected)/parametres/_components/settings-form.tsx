@@ -15,6 +15,7 @@ import { submitWithoutReset } from "@/lib/forms";
 import { formatPhone, normalizePhone } from "@/lib/phone";
 import { saveStoreSettings, type SettingsFormState } from "@/server/settings/actions";
 import type { StoreSettingsFormValues } from "@/server/settings/service";
+import { StoreImageField } from "./store-image-field";
 
 type Values = StoreSettingsFormValues;
 type TextField = Exclude<keyof Values, "showFeatured" | "showNewArrivals">;
@@ -81,7 +82,15 @@ function Section({ title, description, children }: { title: string; description:
   );
 }
 
-export function SettingsForm({ initial }: { initial: Values }) {
+export function SettingsForm({
+  initial,
+  logoKey,
+  heroImageKey,
+}: {
+  initial: Values;
+  logoKey: string | null;
+  heroImageKey: string | null;
+}) {
   const [state, formAction, pending] = useActionState<SettingsFormState, FormData>(saveStoreSettings, undefined);
   const [values, setValues] = useState(initial);
 
@@ -167,7 +176,7 @@ export function SettingsForm({ initial }: { initial: Values }) {
             )}
           </div>
         </Field>
-        <p className="text-xs text-muted-foreground">Le logo s&apos;ajoutera avec l&apos;envoi d&apos;images (semaine 3).</p>
+        <StoreImageField kind="logo" label="Logo" imageKey={logoKey} hint="PNG à fond transparent conseillé. Enregistré immédiatement." />
       </Section>
 
       <Section title="Bannière d'accueil" description="Le grand bloc en haut de la page d'accueil.">
@@ -180,7 +189,7 @@ export function SettingsForm({ initial }: { initial: Values }) {
         <Field id="s-heroCtaLabel" label="Texte du bouton" error={errorOf("heroCtaLabel")} hint="Le bouton mène au catalogue. Laissez vide pour le masquer.">
           <Input {...inputProps("heroCtaLabel")} maxLength={30} placeholder="Voir le catalogue" />
         </Field>
-        <p className="text-xs text-muted-foreground">L&apos;image de la bannière s&apos;ajoutera avec l&apos;envoi d&apos;images (semaine 3).</p>
+        <StoreImageField kind="hero" label="Image de la bannière" imageKey={heroImageKey} hint="Format paysage conseillé (au moins 1600 px de large). Enregistrée immédiatement." />
       </Section>
 
       <Section title="Présentation et informations pratiques" description="Chaque bloc laissé vide est automatiquement masqué sur le site.">

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -21,6 +22,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { mediaUrl } from "@/lib/media";
 import { changeProductStatus, removeProduct, toggleProductFeatured } from "@/server/products/actions";
 import type { ProductListRow } from "@/server/products/service";
 import { StatusBadge } from "./status-badge";
@@ -81,6 +83,14 @@ export function ProductsTable({ rows }: { rows: ProductListRow[] }) {
                       >
                         <Star className={`size-4 ${row.isFeatured ? "fill-amber-400 text-amber-500" : ""}`} aria-hidden />
                       </button>
+                      {/* Vignette de la photo principale (320 px, affichée en 40 px) */}
+                      <div className="relative size-10 shrink-0 overflow-hidden rounded-md border bg-muted/40">
+                        {row.primaryImageKey ? (
+                          <Image src={mediaUrl(row.primaryImageKey, 320)} alt="" fill sizes="40px" unoptimized className="object-cover" />
+                        ) : (
+                          <ImageOff className="absolute inset-0 m-auto size-4 text-muted-foreground" aria-hidden />
+                        )}
+                      </div>
                       <div className="min-w-0">
                         <Link href={`/admin/produits/${row.id}`} className="block truncate font-medium hover:underline">
                           {row.name}

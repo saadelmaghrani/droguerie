@@ -42,4 +42,4 @@ Pages d'administration : `/admin/produits` (liste), `/admin/produits/nouveau`, `
 
 ## À venir
 
-Photos (3 par produit) : tâche 11. Aperçu avant publication et import CSV : tâche 12.
+Aperçu avant publication et import CSV : tâche 12. Photos : voir `docs/images.md`.

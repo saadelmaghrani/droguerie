@@ -34,6 +34,9 @@ yarn-error.log*
 .env*
 !.env.example
 
+# Images envoyées (photos, logo, bannière) — sauvegardées séparément, jamais dans Git
+/storage/
+
 # Prisma — client généré automatiquement (recréé par `prisma generate`)
 /src/generated/
 
