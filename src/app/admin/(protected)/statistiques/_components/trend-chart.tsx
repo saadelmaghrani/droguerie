@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { formatBucket } from "@/lib/format-period";
 
 const SERIES = "#2a78d6"; // teinte catégorielle 1 de la palette de référence (bleu)
-const HEIGHT = 168;
+const DEFAULT_HEIGHT = 168;
 const PAD = { top: 12, right: 12, bottom: 26, left: 40 };
 
 export type TrendPoint = { bucket: string; value: number };
@@ -18,7 +18,19 @@ function niceMax(max: number): number {
   return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * pow;
 }
 
-export function TrendChart({ title, unitLabel, points, unit }: { title: string; unitLabel: string; points: TrendPoint[]; unit: "day" | "month" }) {
+export function TrendChart({
+  title,
+  unitLabel,
+  points,
+  unit,
+  height: HEIGHT = DEFAULT_HEIGHT,
+}: {
+  title: string;
+  unitLabel: string;
+  points: TrendPoint[];
+  unit: "day" | "month";
+  height?: number;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   // Largeur mesurée sur le conteneur (ResizeObserver). Valeur de départ petite : un graphique ne doit
   // jamais élargir sa colonne (sinon il se mesure lui-même et ne rétrécit plus).

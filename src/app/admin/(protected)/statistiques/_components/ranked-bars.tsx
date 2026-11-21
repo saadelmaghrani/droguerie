@@ -54,29 +54,3 @@ export function RankedBars({ rows, viewsLabel, empty }: { rows: RankedRow[]; vie
     </div>
   );
 }
-
-/** Répartition simple (appareils, provenance) : barres + pourcentage. */
-export function ShareBars({ rows }: { rows: { label: string; value: number }[] }) {
-  const total = rows.reduce((s, r) => s + r.value, 0);
-  if (total === 0) return <p className="py-4 text-center text-sm text-muted-foreground">Pas encore de données.</p>;
-  return (
-    <ul className="grid gap-2.5 text-sm">
-      {rows.map((r) => {
-        const pct = (r.value / total) * 100;
-        return (
-          <li key={r.label} className="grid gap-1">
-            <div className="flex justify-between gap-2">
-              <span className="truncate">{r.label}</span>
-              <span className="tabular-nums text-muted-foreground">
-                {pct.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} % · {r.value.toLocaleString("fr-FR")}
-              </span>
-            </div>
-            <div className="h-2 overflow-hidden rounded-full bg-muted/60">
-              <div className="h-full rounded-full" style={{ width: `${pct}%`, background: SERIES }} />
-            </div>
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
