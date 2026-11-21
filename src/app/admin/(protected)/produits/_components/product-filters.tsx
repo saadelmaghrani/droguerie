@@ -17,14 +17,16 @@ export function ProductFilters({
   q,
   categoryId,
   statusUrl,
+  photo,
   categories,
 }: {
   q: string;
   categoryId: string;
   statusUrl: string;
+  photo: string;
   categories: { id: string; name: string; isActive: boolean }[];
 }) {
-  const active = Boolean(q || categoryId || statusUrl);
+  const active = Boolean(q || categoryId || statusUrl || photo);
   // Changer une liste déroulante relance la recherche immédiatement.
   const submitOnChange = (e: React.ChangeEvent<HTMLSelectElement>) => e.currentTarget.form?.requestSubmit();
 
@@ -58,6 +60,10 @@ export function ProductFilters({
             {STATUS_INFO[s].label}
           </option>
         ))}
+      </select>
+      <select name="photo" defaultValue={photo} onChange={submitOnChange} aria-label="Filtrer par photo" className={selectClass}>
+        <option value="">Avec ou sans photo</option>
+        <option value="sans">Sans photo</option>
       </select>
       <div className="flex gap-2">
         <Button type="submit" variant="secondary">

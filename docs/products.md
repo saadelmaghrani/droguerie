@@ -31,6 +31,22 @@ Pages d'administration : `/admin/produits` (liste), `/admin/produits/nouveau`, `
 - Avertissements : produit publié sans photo ; produit publié dans une catégorie masquée.
 - **Aucun champ prix** (exigence du cahier des charges).
 
+## Photo principale obligatoire (décision du 21/11/2026)
+
+| Situation | Règle |
+|---|---|
+| Nouveau produit (formulaire, manuel ou IA) | Au moins une photo avant « Créer le produit » (bloqué dans le formulaire) |
+| Passer en « Publié » (fiche, liste, aperçu) | **Refusé sans photo principale** par le serveur : « Ajoutez une photo principale pour publier ce produit. » |
+| Création avec statut « Publié » | Créé en brouillon, puis publié automatiquement une fois la photo envoyée |
+| Produit **déjà publié** sans photo (antérieur à la règle) | Reste publié et modifiable ; le site affiche une **image par défaut** (pictogramme de sa catégorie, « Photo à venir ») |
+| Import CSV « Publié » sans photo | Nouveau produit → importé **en brouillon** ; produit existant non publié sans photo → statut inchangé ; annoncé dans l'analyse |
+
+Règle : `publishBlockedReason` (`src/lib/product-visibility.ts`, testé), appliquée dans
+`updateProduct` / `setProductStatus` / `createProduct` (`service.ts`) et `validateImportRows`.
+Suivi : filtre « Sans photo » de la liste (`?photo=sans`) et alerte sur le tableau de bord
+(« N produits publiés sans photo »).
+Supprimer la dernière photo d'un produit publié est permis : il passe alors à l'image par défaut.
+
 ## Aperçu avant publication
 
 Page `/admin/produits/<id>/apercu` (bouton « Aperçu » de la fiche, ou menu « ⋯ » de la liste).
@@ -45,7 +61,7 @@ Page `/admin/produits/<id>/apercu` (bouton « Aperçu » de la fiche, ou menu «
 |---|---|
 | Statut Brouillon ou Masqué | Bloquant : absent du site |
 | Catégorie masquée | Bloquant : absent du site |
-| Aucune photo | Avertissement : image neutre affichée |
+| Aucune photo | Publié : avertissement (image par défaut) ; non publié : **bloquant** (photo obligatoire pour publier) |
 | Pas de description | Avertissement |
 | Aucun numéro WhatsApp actif | Avertissement : pas de bouton de contact |
 

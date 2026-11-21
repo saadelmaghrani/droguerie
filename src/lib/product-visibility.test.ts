@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pickWhatsappPhone, productVisibilityIssues, productWhatsappMessage } from "./product-visibility";
+import { pickWhatsappPhone, productVisibilityIssues, productWhatsappMessage, publishBlockedReason } from "./product-visibility";
 
 describe("pickWhatsappPhone", () => {
   const cat = { phone: "212611111111", isActive: true };
@@ -61,8 +61,31 @@ describe("productVisibilityIssues", () => {
     expect(issues[0]).toMatchObject({ level: "blocking" });
     expect(issues[0]!.message).toContain("Peinture");
   });
-  it("photo, description et WhatsApp manquants sont des avertissements", () => {
+  it("publié : photo, description et WhatsApp manquants sont des avertissements", () => {
     const issues = productVisibilityIssues({ ...ok, imageCount: 0, hasWhatsapp: false, hasDescription: false });
     expect(issues.map((i) => i.level)).toEqual(["warning", "warning", "warning"]);
+    expect(issues[0]!.message).toContain("image par défaut");
+  });
+  it("brouillon sans photo : la photo est bloquante pour publier", () => {
+    const issues = productVisibilityIssues({ ...ok, status: "DRAFT", imageCount: 0 });
+    expect(issues.find((i) => i.message.includes("Photo principale obligatoire"))?.level).toBe("blocking");
+  });
+});
+
+describe("publishBlockedReason", () => {
+  it("publier sans photo : refusé", () => {
+    expect(publishBlockedReason({ currentStatus: "DRAFT", nextStatus: "PUBLISHED", hasPhoto: false })).toMatch(/photo principale/);
+    expect(publishBlockedReason({ currentStatus: "HIDDEN", nextStatus: "PUBLISHED", hasPhoto: false })).not.toBeNull();
+    expect(publishBlockedReason({ currentStatus: null, nextStatus: "PUBLISHED", hasPhoto: false })).not.toBeNull();
+  });
+  it("publier avec photo : permis", () => {
+    expect(publishBlockedReason({ currentStatus: "DRAFT", nextStatus: "PUBLISHED", hasPhoto: true })).toBeNull();
+  });
+  it("produit déjà publié sans photo : reste publié (image par défaut)", () => {
+    expect(publishBlockedReason({ currentStatus: "PUBLISHED", nextStatus: "PUBLISHED", hasPhoto: false })).toBeNull();
+  });
+  it("brouillon / masquer sans photo : permis", () => {
+    expect(publishBlockedReason({ currentStatus: "PUBLISHED", nextStatus: "DRAFT", hasPhoto: false })).toBeNull();
+    expect(publishBlockedReason({ currentStatus: "DRAFT", nextStatus: "HIDDEN", hasPhoto: false })).toBeNull();
   });
 });

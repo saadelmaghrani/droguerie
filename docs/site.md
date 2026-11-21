@@ -57,3 +57,9 @@ petite image. Chargement différé hors écran.
   (Facebook, WhatsApp…) : `generateMetadata` de chaque page.
 - `SITE_URL` (`.env`) : adresse publique du site, indispensable en production pour les liens absolus
   (aperçus de partage, sitemap, lien dans le message WhatsApp).
+
+## Produit sans photo
+
+Image par défaut (`src/components/catalogue/product-placeholder.tsx`) : pictogramme de la catégorie sur un
+fond teinté de la couleur du site, libellé « Photo à venir ». Concerne uniquement les produits publiés
+avant la règle « photo obligatoire » (voir `docs/products.md`).

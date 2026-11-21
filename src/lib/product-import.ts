@@ -74,7 +74,14 @@ const TRUE_VALUES = ["oui", "o", "yes", "y", "1", "x", "vrai", "true"];
 const FALSE_VALUES = ["non", "n", "no", "0", "faux", "false"];
 
 export type ImportCategory = { id: string; name: string; slug: string };
-export type ExistingProduct = { id: string; name: string; reference: string };
+export type ExistingProduct = {
+  id: string;
+  name: string;
+  reference: string;
+  status?: ProductStatusValue;
+  /** A déjà une photo principale (sinon il ne peut pas être publié). */
+  hasPhoto?: boolean;
+};
 
 /** Valeurs à écrire. undefined = cellule vide → valeur inchangée (mise à jour) ou valeur par défaut (création). */
 export type ImportRowData = {
@@ -88,9 +95,10 @@ export type ImportRowData = {
   isFeatured?: boolean;
 };
 
+/** publishDeferred : « Publié » demandé, mais pas de photo → importé / laissé non publié. */
 export type ImportRow =
-  | { line: number; action: "create"; data: ImportRowData }
-  | { line: number; action: "update"; productId: string; data: ImportRowData }
+  | { line: number; action: "create"; data: ImportRowData; publishDeferred?: boolean }
+  | { line: number; action: "update"; productId: string; data: ImportRowData; publishDeferred?: boolean }
   | { line: number; action: "error"; errors: string[]; name: string };
 
 export function validateImportRows(
@@ -168,6 +176,21 @@ export function validateImportRows(
     }
 
     if (errors.length > 0) return { line, action: "error", errors, name: name || existingProduct?.name || "" };
+
+    // Photo obligatoire pour publier (les photos ne passent pas par le CSV) :
+    //  - nouveau produit « Publié » → importé en brouillon ;
+    //  - produit existant non publié et sans photo → statut inchangé.
+    // Un produit DÉJÀ publié le reste (image par défaut sur le site tant qu'il n'a pas de photo).
+    if (data.status === "PUBLISHED") {
+      if (!existingProduct) {
+        return { line, action: "create", data: { ...data, status: "DRAFT" }, publishDeferred: true };
+      }
+      if (existingProduct.status !== "PUBLISHED" && !existingProduct.hasPhoto) {
+        const rest = { ...data };
+        delete rest.status;
+        return { line, action: "update", productId: existingProduct.id, data: rest, publishDeferred: true };
+      }
+    }
     return existingProduct
       ? { line, action: "update", productId: existingProduct.id, data }
       : { line, action: "create", data };

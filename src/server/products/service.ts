@@ -4,6 +4,7 @@ import "server-only";
 
 import { Prisma, type ProductStatus } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
+import { publishBlockedReason } from "@/lib/product-visibility";
 import { slugify } from "@/lib/slug";
 import { deleteImageFiles } from "@/server/media/images";
 import { productImageKeys } from "./images-service";
@@ -12,7 +13,7 @@ export const PRODUCTS_PAGE_SIZE = 20;
 
 export type ProductField = "name" | "slug" | "description" | "reference" | "brand" | "categoryId" | "status";
 export type ServiceResult =
-  | { ok: true; message: string; id?: string }
+  | { ok: true; message: string; id?: string; pendingPublish?: boolean }
   | { ok: false; message: string; field?: ProductField };
 
 export type ProductListRow = {
@@ -34,6 +35,8 @@ export type ProductListQuery = {
   q: string;
   categoryId: string | null;
   status: ProductStatus | null;
+  /** true : seulement les produits sans photo principale. */
+  withoutPhoto?: boolean;
   page: number;
 };
 
@@ -78,6 +81,7 @@ export async function listProducts(query: ProductListQuery): Promise<{
   const conditions: Prisma.Sql[] = [];
   if (query.categoryId) conditions.push(Prisma.sql`p.category_id = ${query.categoryId}::uuid`);
   if (query.status) conditions.push(Prisma.sql`p.status = ${query.status}::product_status`);
+  if (query.withoutPhoto) conditions.push(Prisma.sql`NOT EXISTS (SELECT 1 FROM product_images i WHERE i.product_id = p.id AND i.position = 0)`);
   if (q) {
     conditions.push(Prisma.sql`(
       ${document} @@ ${tsQuery}
@@ -207,10 +211,13 @@ export async function createProduct(data: ProductInput): Promise<ServiceResult> 
   try {
     // À la création, une adresse déjà prise reçoit automatiquement un suffixe (-2, -3…).
     const slug = await availableSlug(data.slug || slugify(data.name));
+    // Photo obligatoire pour publier : un nouveau produit n'a pas encore de photo (elles sont envoyées
+    // juste après la création). Il est donc créé en brouillon, puis publié une fois la photo ajoutée.
+    const pendingPublish = data.status === "PUBLISHED";
     const product = await prisma.product.create({
-      data: { ...data, slug, publishedAt: data.status === "PUBLISHED" ? new Date() : null },
+      data: { ...data, slug, status: pendingPublish ? "DRAFT" : data.status, publishedAt: null },
     });
-    return { ok: true, message: `Produit « ${product.name} » créé.`, id: product.id };
+    return { ok: true, message: `Produit « ${product.name} » créé.`, id: product.id, pendingPublish };
   } catch (error) {
     const duplicate = uniqueViolation(error);
     if (duplicate) return duplicate;
@@ -221,8 +228,13 @@ export async function createProduct(data: ProductInput): Promise<ServiceResult> 
 export async function updateProduct(id: string, data: ProductInput): Promise<ServiceResult> {
   const invalid = await validate(data, id);
   if (invalid) return invalid;
-  const current = await prisma.product.findUnique({ where: { id }, select: { publishedAt: true } });
+  const current = await prisma.product.findUnique({
+    where: { id },
+    select: { publishedAt: true, status: true, _count: { select: { images: { where: { position: 0 } } } } },
+  });
   if (!current) return NOT_FOUND;
+  const blocked = publishBlockedReason({ currentStatus: current.status, nextStatus: data.status, hasPhoto: current._count.images > 0 });
+  if (blocked) return { ok: false, message: blocked, field: "status" };
   // À la modification, l'adresse est choisie explicitement : un doublon est une erreur.
   const slugOwner = await prisma.product.findFirst({ where: { slug: data.slug, id: { not: id } }, select: { name: true } });
   if (slugOwner) return { ok: false, message: `Cette adresse est déjà utilisée par « ${slugOwner.name} ».`, field: "slug" };
@@ -251,8 +263,13 @@ const STATUS_MESSAGES: Record<ProductStatus, string> = {
 };
 
 export async function setProductStatus(id: string, status: ProductStatus): Promise<ServiceResult> {
-  const current = await prisma.product.findUnique({ where: { id }, select: { name: true, publishedAt: true } });
+  const current = await prisma.product.findUnique({
+    where: { id },
+    select: { name: true, publishedAt: true, status: true, _count: { select: { images: { where: { position: 0 } } } } },
+  });
   if (!current) return NOT_FOUND;
+  const blocked = publishBlockedReason({ currentStatus: current.status, nextStatus: status, hasPhoto: current._count.images > 0 });
+  if (blocked) return { ok: false, message: `« ${current.name} » : ${blocked.charAt(0).toLowerCase()}${blocked.slice(1)}` };
   await prisma.product.update({
     where: { id },
     data: { status, publishedAt: current.publishedAt ?? (status === "PUBLISHED" ? new Date() : null) },

@@ -49,7 +49,13 @@ export function productVisibilityIssues(p: {
       message: `La catégorie « ${p.categoryName} » est masquée : ses produits ne sont pas visibles sur le site.`,
     });
   }
-  if (p.imageCount === 0) issues.push({ level: "warning", message: "Aucune photo : une image neutre sera affichée." });
+  if (p.imageCount === 0) {
+    issues.push(
+      p.status === "PUBLISHED"
+        ? { level: "warning", message: "Aucune photo : le site affiche une image par défaut (pictogramme de la catégorie)." }
+        : { level: "blocking", message: "Photo principale obligatoire pour publier ce produit." },
+    );
+  }
   if (!p.hasDescription) issues.push({ level: "warning", message: "Pas de description." });
   if (!p.hasWhatsapp) {
     issues.push({
@@ -58,4 +64,19 @@ export function productVisibilityIssues(p: {
     });
   }
   return issues;
+}
+
+/** Message affiché quand on tente de publier un produit sans photo principale. */
+export const PHOTO_REQUIRED_TO_PUBLISH = "Ajoutez une photo principale pour publier ce produit.";
+
+/**
+ * Règle « photo obligatoire » (décision du 21/11/2026) :
+ *  - PASSER en « Publié » exige une photo principale ;
+ *  - un produit DÉJÀ publié sans photo (antérieur à la règle) reste publié : le site affiche
+ *    une image par défaut (pictogramme de sa catégorie) jusqu'à l'ajout d'une photo.
+ * Renvoie le message d'erreur, ou null si le changement est permis.
+ */
+export function publishBlockedReason(p: { currentStatus: ProductStatusValue | null; nextStatus: ProductStatusValue; hasPhoto: boolean }): string | null {
+  if (p.nextStatus !== "PUBLISHED" || p.hasPhoto || p.currentStatus === "PUBLISHED") return null;
+  return PHOTO_REQUIRED_TO_PUBLISH;
 }

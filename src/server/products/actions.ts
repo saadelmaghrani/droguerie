@@ -31,7 +31,7 @@ export type ProductFormValues = {
 };
 
 export type ProductFormState =
-  | { ok: true; message: string; id: string; created: boolean; submissionId: number }
+  | { ok: true; message: string; id: string; created: boolean; pendingPublish: boolean; submissionId: number }
   | { ok: false; message: string; fieldErrors: Partial<Record<ProductField, string>>; values: ProductFormValues; submissionId: number }
   | undefined;
 
@@ -96,7 +96,7 @@ export async function saveProduct(_previous: ProductFormState, formData: FormDat
   }
   refresh();
   invalidateCatalogue();
-  return { ok: true, message: result.message, id: result.id!, created: !id, submissionId };
+  return { ok: true, message: result.message, id: result.id!, created: !id, pendingPublish: result.pendingPublish ?? false, submissionId };
 }
 
 async function runRowAction(id: unknown, operation: (id: string) => Promise<ServiceResult>): Promise<ServiceResult> {

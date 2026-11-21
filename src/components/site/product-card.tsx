@@ -1,6 +1,6 @@
 // Carte produit du catalogue (accueil, catalogue, catégories). Aucun prix (cahier des charges).
 import Link from "next/link";
-import { ImageOff } from "lucide-react";
+import { ProductPlaceholder } from "@/components/catalogue/product-placeholder";
 import { mediaSrcSet, mediaUrl } from "@/lib/media";
 import type { ProductCardData } from "@/server/catalogue/queries";
 
@@ -26,9 +26,7 @@ export function ProductCard({ product, priority = false }: { product: ProductCar
             className="absolute inset-0 size-full object-contain transition-transform duration-300 group-hover:scale-[1.03]"
           />
         ) : (
-          <div className="flex size-full items-center justify-center bg-slate-100 text-slate-400">
-            <ImageOff className="size-8" aria-hidden />
-          </div>
+          <ProductPlaceholder icon={product.categoryIcon} className="absolute inset-0" />
         )}
       </div>
       <div className="grid gap-0.5 px-1 pb-1">

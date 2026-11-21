@@ -34,13 +34,25 @@ describe("mapHeader", () => {
 });
 
 describe("validateImportRows", () => {
-  it("ligne complète → création", () => {
+  it("ligne complète « Publié » → création EN BROUILLON (photo obligatoire pour publier)", () => {
     const { rows } = run("Nom;Catégorie;Statut;Mis en avant\nSeau 10 L;peinture;Publié;oui");
     expect(rows[0]).toEqual({
       line: 2,
       action: "create",
-      data: { name: "Seau 10 L", categoryId: "c-peinture", categoryName: "Peinture", status: "PUBLISHED", isFeatured: true },
+      data: { name: "Seau 10 L", categoryId: "c-peinture", categoryName: "Peinture", status: "DRAFT", isFeatured: true },
+      publishDeferred: true,
     });
+  });
+  it("mise à jour vers « Publié » : refusée sans photo, permise avec photo ou si déjà publié", () => {
+    const csv = "Nom;Catégorie;Référence;Statut\n;;EP-10;Publié";
+    const [header, ...records] = parseCsv(csv);
+    const m = mapHeader(header!.cells);
+    const withState = (status: "DRAFT" | "PUBLISHED", hasPhoto: boolean) =>
+      validateImportRows(records, m.columns, categories, [{ ...existing[0]!, status, hasPhoto }])[0];
+    expect(withState("DRAFT", false)).toMatchObject({ action: "update", publishDeferred: true, data: { reference: "EP-10" } });
+    expect(withState("DRAFT", false)).not.toHaveProperty("data.status");
+    expect(withState("DRAFT", true)).toMatchObject({ action: "update", data: { status: "PUBLISHED" } });
+    expect(withState("PUBLISHED", false)).toMatchObject({ action: "update", data: { status: "PUBLISHED" } });
   });
   it("catégorie reconnue par son nom, sans accents ni majuscules", () => {
     const { rows } = run("Nom;Catégorie\nJavel;PRODUITS D'ENTRETIEN");

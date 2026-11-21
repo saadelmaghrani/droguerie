@@ -36,7 +36,7 @@ export function ProductDetail({
       </nav>
 
       <div className="grid gap-8 lg:grid-cols-2 lg:gap-12">
-        <ProductGallery images={product.images} productName={product.name} />
+        <ProductGallery images={product.images} productName={product.name} placeholderIcon={product.category.icon} />
 
         <div className="grid content-start gap-5">
           <div className="grid gap-2">

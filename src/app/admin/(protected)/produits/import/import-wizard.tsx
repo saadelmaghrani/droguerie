@@ -253,6 +253,16 @@ function Review({
         <Stat label="Lignes en erreur" value={counts.error} icon={<CircleAlert className="size-4" aria-hidden />} tone={counts.error ? "text-destructive" : "text-muted-foreground"} />
       </div>
 
+      {analysis.publishDeferred > 0 && (
+        <p className="flex items-start gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <TriangleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+          {plural(analysis.publishDeferred, "produit")} marqué{analysis.publishDeferred > 1 ? "s" : ""} « Publié » ser
+          {analysis.publishDeferred > 1 ? "ont" : "a"} importé{analysis.publishDeferred > 1 ? "s" : ""} non publié
+          {analysis.publishDeferred > 1 ? "s" : ""} : la photo principale est obligatoire pour publier. Ajoutez leur photo, puis publiez-les
+          depuis la liste (filtre « Sans photo »).
+        </p>
+      )}
+
       {(analysis.priceColumns.length > 0 || analysis.ignoredColumns.length > 0) && (
         <div className="grid gap-1 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           {analysis.priceColumns.length > 0 && (
@@ -344,7 +354,9 @@ function Review({
                         <td className="hidden px-3 py-2 sm:table-cell">{row.data.categoryName ?? unchanged}</td>
                         <td className="hidden px-3 py-2 font-mono text-xs md:table-cell">{row.data.reference ?? "—"}</td>
                         <td className="hidden px-3 py-2 md:table-cell">
-                          {row.data.status ? STATUS_INFO[row.data.status].label : isCreate ? STATUS_INFO.DRAFT.label : unchanged}
+                          {row.publishDeferred
+                            ? isCreate ? "Brouillon (photo requise)" : "Inchangé (photo requise)"
+                            : row.data.status ? STATUS_INFO[row.data.status].label : isCreate ? STATUS_INFO.DRAFT.label : unchanged}
                         </td>
                       </tr>
                     );

@@ -2,21 +2,21 @@
 
 // Galerie de la fiche produit : grande photo + vignettes cliquables (3 photos maximum).
 import { useState } from "react";
-import { ImageOff } from "lucide-react";
+import type { CategoryIconKey } from "@/lib/category-icons";
+import { ProductPlaceholder } from "./product-placeholder";
 import { mediaSrcSet, mediaUrl } from "@/lib/media";
 import { cn } from "@/lib/utils";
 
 type GalleryImage = { id: string; storageKey: string; width: number; height: number };
 
-export function ProductGallery({ images, productName }: { images: GalleryImage[]; productName: string }) {
+export function ProductGallery({ images, productName, placeholderIcon }: { images: GalleryImage[]; productName: string; placeholderIcon: CategoryIconKey }) {
   const [selectedId, setSelectedId] = useState(images[0]?.id);
   const selected = images.find((i) => i.id === selectedId) ?? images[0];
 
   if (!selected) {
     return (
-      <div className="flex aspect-square flex-col items-center justify-center gap-2 rounded-2xl bg-slate-100 text-slate-400">
-        <ImageOff className="size-10" aria-hidden />
-        <span className="text-sm">Photo bientôt disponible</span>
+      <div className="aspect-square overflow-hidden rounded-2xl ring-1 ring-slate-200">
+        <ProductPlaceholder icon={placeholderIcon} size="lg" />
       </div>
     );
   }

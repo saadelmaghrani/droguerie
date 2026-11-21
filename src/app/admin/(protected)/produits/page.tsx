@@ -26,18 +26,20 @@ async function ProductsContent({ searchParams }: { searchParams: SearchParams })
   const q = first(sp.q).slice(0, 100);
   const categoryId = UUID.test(first(sp.categorie)) ? first(sp.categorie) : "";
   const status = statusFromUrl(first(sp.statut));
+  const withoutPhoto = first(sp.photo) === "sans";
   const requestedPage = Math.max(1, Math.min(10_000, Number.parseInt(first(sp.page), 10) || 1));
 
   const [list, categories] = await Promise.all([
-    listProducts({ q, categoryId: categoryId || null, status, page: requestedPage }),
+    listProducts({ q, categoryId: categoryId || null, status, withoutPhoto, page: requestedPage }),
     listCategoryOptions(),
   ]);
-  const filtered = Boolean(q || categoryId || status);
+  const filtered = Boolean(q || categoryId || status || withoutPhoto);
   const pageHref = (page: number) => {
     const params = new URLSearchParams();
     if (q) params.set("q", q);
     if (categoryId) params.set("categorie", categoryId);
     if (status) params.set("statut", STATUS_INFO[status].url);
+    if (withoutPhoto) params.set("photo", "sans");
     if (page > 1) params.set("page", String(page));
     const query = params.toString();
     return `/admin/produits${query ? `?${query}` : ""}`;
@@ -47,10 +49,11 @@ async function ProductsContent({ searchParams }: { searchParams: SearchParams })
     <div className="grid gap-4">
       {/* key : les champs se remettent à jour quand l'URL change (ex. « Effacer »). */}
       <ProductFilters
-        key={`${q}|${categoryId}|${status}`}
+        key={`${q}|${categoryId}|${status}|${withoutPhoto}`}
         q={q}
         categoryId={categoryId}
         statusUrl={status ? STATUS_INFO[status].url : ""}
+        photo={withoutPhoto ? "sans" : ""}
         categories={categories}
       />
 

@@ -25,6 +25,8 @@ import { submitWithoutReset } from "@/lib/forms";
 import { PRODUCT_STATUSES, STATUS_INFO, type ProductStatusValue } from "@/lib/product-status";
 import { slugify } from "@/lib/slug";
 import { removeProduct, saveProduct, type ProductFormState, type ProductFormValues } from "@/server/products/actions";
+import { PHOTO_REQUIRED_TO_PUBLISH } from "@/lib/product-visibility";
+import { changeProductStatus } from "@/server/products/actions";
 import { uploadProductImage } from "@/server/products/image-actions";
 import { attachProductDraftAction } from "@/server/ai/actions";
 import { defaultDraftChoice, DraftPhotos, type DraftChoice } from "./draft-photos";
@@ -77,6 +79,8 @@ export function ProductForm({
   const [draft, setDraft] = useState<ProductDraft | null>(null);
   const [draftChoice, setDraftChoice] = useState<DraftChoice>({ main: "original", keep: [] });
   const [generating, setGenerating] = useState(false);
+  // Nouveau produit : photo principale obligatoire (message affiché si l'admin tente de créer sans photo).
+  const [photoMissing, setPhotoMissing] = useState(false);
   const [slugEdited, setSlugEdited] = useState(Boolean(product));
   const set = <K extends keyof ProductFormValues>(key: K, value: ProductFormValues[K]) => setValues((v) => ({ ...v, [key]: value }));
 
@@ -115,6 +119,16 @@ export function ProductForm({
           toast.error(`Photo ${index + 1} non envoyée. Vous pourrez l'ajouter depuis la fiche.`);
         }
       }
+      // Publication demandée : faite maintenant que la photo est en place (refusée par le serveur sinon).
+      if (state.pendingPublish && !cancelled) {
+        try {
+          const published = await changeProductStatus(productId, "PUBLISHED");
+          if (published.ok) toast.success(published.message);
+          else toast.warning(`Produit enregistré en brouillon. ${published.message}`);
+        } catch {
+          toast.warning("Produit enregistré en brouillon : publiez-le depuis sa fiche.");
+        }
+      }
       if (!cancelled) router.replace(`/admin/produits/${productId}`);
     })();
     return () => {
@@ -143,7 +157,21 @@ export function ProductForm({
   const dirty = JSON.stringify(values) !== JSON.stringify(initial);
 
   return (
-    <form onSubmit={submitWithoutReset(formAction)} className="grid gap-6 pb-24" noValidate>
+    <form
+      onSubmit={(event) => {
+        // Nouveau produit : au moins une photo choisie (ou générée) avant la création.
+        if (!product && !draft && pendingImages.length === 0) {
+          event.preventDefault();
+          setPhotoMissing(true);
+          toast.error("Ajoutez la photo principale du produit avant de le créer.");
+          document.getElementById("photos")?.scrollIntoView({ behavior: "smooth", block: "center" });
+          return;
+        }
+        submitWithoutReset(formAction)(event);
+      }}
+      className="grid gap-6 pb-24"
+      noValidate
+    >
       <input type="hidden" name="id" value={product?.id ?? ""} />
       <input type="hidden" name="categoryId" value={values.categoryId} />
       <input type="hidden" name="isFeatured" value={values.isFeatured ? "on" : ""} />
@@ -250,11 +278,20 @@ export function ProductForm({
             </CardContent>
           </Card>
 
-          <Card>
+          <Card id="photos" className={photoMissing && !product && !draft && pendingImages.length === 0 ? "ring-2 ring-destructive/60" : undefined}>
             <CardHeader>
-              <CardTitle>Photos</CardTitle>
+              <CardTitle>
+                Photos
+                {!product && <span className="ml-1.5 text-sm font-normal text-muted-foreground">(photo principale obligatoire)</span>}
+              </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="grid gap-3">
+              {photoMissing && !product && !draft && pendingImages.length === 0 && (
+                <p role="alert" className="flex items-start gap-1.5 text-sm text-destructive">
+                  <CircleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+                  Ajoutez au moins une photo : la première sera la photo principale.
+                </p>
+              )}
               {product ? (
                 <ProductImages productId={product.id} productName={product.name} images={product.images} />
               ) : (
@@ -306,11 +343,18 @@ export function ProductForm({
                   La catégorie « {category.name} » est masquée : ce produit ne sera pas visible tant qu&apos;elle l&apos;est.
                 </p>
               )}
-              {values.status === "PUBLISHED" && (product?.imageCount ?? (draft ? 1 : pendingImages.length)) === 0 && (
-                <p className="flex items-start gap-1.5 text-sm text-amber-700">
-                  <TriangleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-                  Ce produit n&apos;a pas encore de photo.
-                </p>
+              {values.status === "PUBLISHED" && product && product.imageCount === 0 && (
+                product.status === "PUBLISHED" ? (
+                  <p className="flex items-start gap-1.5 text-sm text-amber-700">
+                    <TriangleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+                    Pas de photo : le site affiche une image par défaut (pictogramme de la catégorie). Ajoutez une photo dès que possible.
+                  </p>
+                ) : (
+                  <p className="flex items-start gap-1.5 text-sm text-destructive">
+                    <CircleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+                    {PHOTO_REQUIRED_TO_PUBLISH}
+                  </p>
+                )
               )}
             </CardContent>
           </Card>

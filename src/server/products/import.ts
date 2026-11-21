@@ -21,6 +21,8 @@ export type ImportAnalysis = {
   ignoredColumns: string[];
   priceColumns: string[];
   counts: { create: number; update: number; error: number };
+  /** Lignes « Publié » importées / laissées non publiées faute de photo. */
+  publishDeferred: number;
 };
 
 export type AnalysisResult = { ok: true; analysis: ImportAnalysis } | { ok: false; message: string };
@@ -64,17 +66,21 @@ export async function analyzeCsv(file: File): Promise<AnalysisResult> {
 
   const [categories, existing] = await Promise.all([
     prisma.category.findMany({ select: { id: true, name: true, slug: true } }),
-    prisma.product.findMany({ where: { reference: { not: null } }, select: { id: true, name: true, reference: true } }),
+    prisma.product.findMany({
+      where: { reference: { not: null } },
+      select: { id: true, name: true, reference: true, status: true, _count: { select: { images: { where: { position: 0 } } } } },
+    }),
   ]);
   const rows = validateImportRows(
     records,
     mapping.columns,
     categories,
-    existing.map((p) => ({ id: p.id, name: p.name, reference: p.reference! })),
+    existing.map((p) => ({ id: p.id, name: p.name, reference: p.reference!, status: p.status, hasPhoto: p._count.images > 0 })),
   );
   const counts = { create: 0, update: 0, error: 0 };
   for (const row of rows) counts[row.action]++;
-  return { ok: true, analysis: { rows, ignoredColumns: mapping.ignored, priceColumns: mapping.priceColumns, counts } };
+  const publishDeferred = rows.filter((r) => r.action !== "error" && r.publishDeferred).length;
+  return { ok: true, analysis: { rows, ignoredColumns: mapping.ignored, priceColumns: mapping.priceColumns, counts, publishDeferred } };
 }
 
 /** Adresses libres pour les nouveaux produits : base, base-2, base-3… (calculées en mémoire). */

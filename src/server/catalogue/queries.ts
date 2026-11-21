@@ -129,6 +129,8 @@ export type ProductCardData = {
   slug: string;
   brand: string | null;
   categoryName: string;
+  /** Pictogramme de la catégorie : image par défaut si le produit n'a pas de photo. */
+  categoryIcon: CategoryIconKey;
   image: { key: string; width: number; height: number } | null;
 };
 
@@ -138,7 +140,7 @@ const cardSelect = {
   name: true,
   slug: true,
   brand: true,
-  category: { select: { name: true } },
+  category: { select: { name: true, icon: true } },
   images: { where: { position: 0 }, select: { storageKey: true, width: true, height: true } },
 } satisfies Prisma.ProductSelect;
 
@@ -151,6 +153,7 @@ function toCard(p: CardRow): ProductCardData {
     slug: p.slug,
     brand: p.brand,
     categoryName: p.category.name,
+    categoryIcon: categoryIconKey(p.category.icon, p.category.name),
     image: image ? { key: image.storageKey, width: image.width, height: image.height } : null,
   };
 }
@@ -246,13 +249,14 @@ export async function getPublicProduct(slug: string): Promise<PublicProduct | nu
   const product = await prisma.product.findFirst({
     where: { slug, ...visibleWhere },
     include: {
-      category: { select: { id: true, name: true, slug: true, isActive: true, whatsappNumber: { select: { phone: true, isActive: true } } } },
+      category: { select: { id: true, name: true, slug: true, isActive: true, icon: true, whatsappNumber: { select: { phone: true, isActive: true } } } },
       images: { orderBy: { position: "asc" }, select: { id: true, storageKey: true, width: true, height: true } },
     },
   });
   if (!product) return null;
   const defaultNumber = await prisma.whatsappNumber.findFirst({ where: { isDefault: true }, select: { phone: true, isActive: true } });
-  const { whatsappNumber, id: categoryId, ...category } = product.category;
+  const { whatsappNumber, id: categoryId, icon, ...rest } = product.category;
+  const category = { ...rest, icon: categoryIconKey(icon, rest.name) };
   return {
     id: product.id,
     name: product.name,

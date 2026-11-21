@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
-import { ArrowRight, FileText, MessageCircle, Package, Tags, type LucideIcon } from "lucide-react";
+import { ArrowRight, FileText, MessageCircle, Package, Tags, TriangleAlert, type LucideIcon } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { prisma } from "@/lib/prisma";
@@ -16,11 +16,12 @@ type Stat = { label: string; value: number; hint: string; href: string; icon: Lu
 async function DashboardContent() {
   const admin = await requireAdmin(); // vérification complète en base, AVANT toute lecture
 
-  const [statusCounts, categories, activeWhatsappNumbers, week] = await Promise.all([
+  const [statusCounts, categories, activeWhatsappNumbers, week, publishedWithoutPhoto] = await Promise.all([
     prisma.product.groupBy({ by: ["status"], _count: { _all: true } }),
     prisma.category.count(),
     prisma.whatsappNumber.count({ where: { isActive: true } }),
     getWeekSummary(),
+    prisma.product.count({ where: { status: "PUBLISHED", images: { none: { position: 0 } } } }),
   ]);
   const countFor = (status: "PUBLISHED" | "DRAFT" | "HIDDEN") =>
     statusCounts.find((row) => row.status === status)?._count._all ?? 0;
@@ -37,6 +38,18 @@ async function DashboardContent() {
       <p className="-mt-6 mb-8 text-sm text-muted-foreground">
         Bonjour {admin.name}, voici l&apos;état actuel du catalogue.
       </p>
+      {publishedWithoutPhoto > 0 && (
+        <Link
+          href="/admin/produits?statut=publie&photo=sans"
+          className="mb-6 flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 hover:bg-amber-100"
+        >
+          <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+          <span>
+            <strong>{publishedWithoutPhoto} produit{publishedWithoutPhoto > 1 ? "s" : ""} publié{publishedWithoutPhoto > 1 ? "s" : ""} sans photo</strong> :
+            le site affiche une image par défaut. Ajoutez leur photo principale →
+          </span>
+        </Link>
+      )}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {stats.map(({ label, value, hint, href, icon: Icon }) => (
           <Link
