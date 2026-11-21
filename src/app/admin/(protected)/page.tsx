@@ -24,8 +24,8 @@ async function DashboardContent() {
     statusCounts.find((row) => row.status === status)?._count._all ?? 0;
 
   const stats: Stat[] = [
-    { label: "Produits publiés", value: countFor("PUBLISHED"), hint: "Visibles sur le site", href: "/admin/produits", icon: Package },
-    { label: "Brouillons", value: countFor("DRAFT"), hint: "En attente de publication", href: "/admin/produits", icon: FileText },
+    { label: "Produits publiés", value: countFor("PUBLISHED"), hint: "Visibles sur le site", href: "/admin/produits?statut=publie", icon: Package },
+    { label: "Brouillons", value: countFor("DRAFT"), hint: "En attente de publication", href: "/admin/produits?statut=brouillon", icon: FileText },
     { label: "Catégories", value: categories, hint: "Organisation du catalogue", href: "/admin/categories", icon: Tags },
     { label: "Numéros WhatsApp", value: activeWhatsappNumbers, hint: "Numéros actifs", href: "/admin/whatsapp", icon: MessageCircle },
   ];

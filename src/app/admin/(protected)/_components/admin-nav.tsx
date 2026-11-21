@@ -10,10 +10,17 @@ const linkClass =
   "group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
-/** Liens du menu admin. `onNavigate` sert au menu mobile (fermer le panneau après un clic). */
+/**
+ * Menu admin lisant l'URL courante pour surligner le lien actif.
+ * ⚠️ usePathname() = donnée de la requête : avec Cache Components, ce composant doit être
+ * placé dans un <Suspense> (fallback : <AdminNavLinks pathname="" />, sans lien surligné).
+ */
 export function AdminNav({ onNavigate }: { onNavigate?: () => void }) {
-  const pathname = usePathname();
+  return <AdminNavLinks pathname={usePathname()} onNavigate={onNavigate} />;
+}
 
+/** Liens du menu. `onNavigate` sert au menu mobile (fermer le panneau après un clic). */
+export function AdminNavLinks({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) {
   return (
     <nav aria-label="Administration" className="flex flex-col gap-1">
       {ADMIN_NAV_ITEMS.map(({ href, label, icon: Icon }) => {

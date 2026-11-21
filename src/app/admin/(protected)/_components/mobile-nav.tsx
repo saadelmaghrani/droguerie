@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,7 +11,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { AdminNav } from "./admin-nav";
+import { AdminNav, AdminNavLinks } from "./admin-nav";
 
 /**
  * Menu mobile : bouton ☰ qui ouvre le menu dans un panneau latéral.
@@ -35,7 +35,9 @@ export function MobileNav({ brand, footer }: { brand: React.ReactNode; footer: R
           {brand}
         </SheetHeader>
         <div className="flex-1 overflow-y-auto px-3 py-4">
-          <AdminNav onNavigate={() => setOpen(false)} />
+          <Suspense fallback={<AdminNavLinks pathname="" />}>
+            <AdminNav onNavigate={() => setOpen(false)} />
+          </Suspense>
         </div>
         <div className="border-t border-sidebar-border p-3">{footer}</div>
       </SheetContent>

@@ -12,7 +12,7 @@
 import { Suspense } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { AdminBrand } from "./_components/admin-brand";
-import { AdminNav } from "./_components/admin-nav";
+import { AdminNav, AdminNavLinks } from "./_components/admin-nav";
 import { AdminUserMenu, AdminUserMenuSkeleton } from "./_components/admin-user-menu";
 import { MobileNav } from "./_components/mobile-nav";
 
@@ -34,7 +34,10 @@ export default function ProtectedAdminLayout({ children }: { children: React.Rea
           <AdminBrand />
         </div>
         <div className="flex-1 overflow-y-auto px-3 py-4">
-          <AdminNav />
+          {/* usePathname() lit l'URL : frontière Suspense obligatoire (pages à adresse variable). */}
+          <Suspense fallback={<AdminNavLinks pathname="" />}>
+            <AdminNav />
+          </Suspense>
         </div>
         <div className="border-t border-sidebar-border p-3">
           <UserMenu />

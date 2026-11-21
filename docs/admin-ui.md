@@ -54,6 +54,12 @@ export default function Page() {
 
 Pour l'ajouter au menu : une ligne dans `_components/nav-items.ts`.
 
+## Règles Cache Components à retenir
+
+- Tout ce qui lit la requête doit être dans un `<Suspense>` : `cookies()`, `searchParams`, `params`
+  (pages `[id]`) **et `usePathname()` côté client** (le menu admin est enveloppé pour cette raison).
+- Formulaires à champs contrôlés : `onSubmit={submitWithoutReset(formAction)}` (voir `docs/settings.md`).
+
 ## Thème
 
 Les couleurs sont des variables CSS dans `src/app/globals.css` (`--primary`, `--muted`, `--sidebar`…).

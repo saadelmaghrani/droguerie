@@ -1,0 +1,26 @@
+import type { Metadata } from "next";
+import { Suspense } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { requireAdmin } from "@/server/auth/dal";
+import { listCategoryOptions } from "@/server/products/service";
+import { PageHeader } from "../../_components/page-header";
+import { ProductForm } from "../_components/product-form";
+
+export const metadata: Metadata = { title: "Nouveau produit" };
+
+async function NewProductContent() {
+  await requireAdmin();
+  const categories = await listCategoryOptions();
+  return <ProductForm product={null} categories={categories} />;
+}
+
+export default function NewProductPage() {
+  return (
+    <>
+      <PageHeader title="Nouveau produit" description="Le produit est créé en brouillon par défaut." />
+      <Suspense fallback={<Skeleton className="h-[32rem] rounded-xl" />}>
+        <NewProductContent />
+      </Suspense>
+    </>
+  );
+}
