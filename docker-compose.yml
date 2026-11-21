@@ -1,0 +1,28 @@
+# Environnement de DÉVELOPPEMENT local.
+# Lance uniquement la base PostgreSQL ; l'application Next.js tourne avec `npm run dev`.
+# Les identifiants sont lus depuis le fichier .env (jamais écrits ici).
+
+services:
+  db:
+    image: postgres:18-alpine
+    container_name: droguerie-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER manquant dans .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD manquant dans .env}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB manquant dans .env}
+    ports:
+      # 127.0.0.1 : la base n'est accessible que depuis ton Mac, pas depuis le réseau.
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      # PostgreSQL 18 range ses données dans /var/lib/postgresql/18/docker :
+      # on monte le dossier parent pour que les données survivent aux redémarrages.
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:

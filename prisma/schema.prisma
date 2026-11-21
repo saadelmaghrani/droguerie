@@ -1,0 +1,12 @@
+// Schéma de la base de données (source de vérité).
+// Après chaque modification : `npm run db:migrate` (crée + applique une migration).
+// Les modèles métier (produits, catégories…) seront ajoutés à la tâche suivante.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
