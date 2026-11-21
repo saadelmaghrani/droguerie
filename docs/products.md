@@ -31,6 +31,28 @@ Pages d'administration : `/admin/produits` (liste), `/admin/produits/nouveau`, `
 - Avertissements : produit publié sans photo ; produit publié dans une catégorie masquée.
 - **Aucun champ prix** (exigence du cahier des charges).
 
+## Aperçu avant publication
+
+Page `/admin/produits/<id>/apercu` (bouton « Aperçu » de la fiche, ou menu « ⋯ » de la liste).
+
+- Montre la fiche **exactement comme sur le site** : le même composant
+  `src/components/catalogue/product-detail.tsx` servira à la page publique `/produits/<adresse>`.
+- Affiche la version **enregistrée** : dans la fiche, le bouton « Aperçu » est désactivé tant
+  qu'il reste des modifications non enregistrées.
+- Bandeau : « Visible sur le site » ou non, avec les raisons (`src/lib/product-visibility.ts`) :
+
+| Raison | Effet |
+|---|---|
+| Statut Brouillon ou Masqué | Bloquant : absent du site |
+| Catégorie masquée | Bloquant : absent du site |
+| Aucune photo | Avertissement : image neutre affichée |
+| Pas de description | Avertissement |
+| Aucun numéro WhatsApp actif | Avertissement : pas de bouton de contact |
+
+- Bouton « Publier » directement depuis l'aperçu.
+- Bouton WhatsApp : numéro de la catégorie s'il est actif, sinon le numéro par défaut ;
+  message prérempli « Bonjour, je souhaite connaître le prix et la disponibilité de : <nom> (réf. <référence>) ».
+
 ## Code
 
 | Fichier | Rôle |
@@ -38,8 +60,11 @@ Pages d'administration : `/admin/produits` (liste), `/admin/produits/nouveau`, `
 | `src/server/products/service.ts` | Recherche SQL, règles métier, accès base |
 | `src/server/products/actions.ts` | Actions serveur : `requireAdmin()` → zod → service → `refresh()` |
 | `src/lib/product-status.ts` | Libellés des statuts et correspondance avec l'URL |
-| `src/app/admin/(protected)/produits/` | Liste, filtres, tableau, fiche (création / modification) |
+| `src/server/products/preview.ts` | Données de la fiche publique (photos, numéro WhatsApp résolu) |
+| `src/lib/product-visibility.ts` | Numéro WhatsApp, message prérempli, raisons de non-visibilité (testé) |
+| `src/components/catalogue/` | Fiche produit et galerie du site (réutilisées par l'aperçu) |
+| `src/app/admin/(protected)/produits/` | Liste, filtres, tableau, fiche (création / modification), aperçu |
 
 ## À venir
 
-Aperçu avant publication et import CSV : tâche 12. Photos : voir `docs/images.md`.
+Import CSV : tâche 12 (suite). Photos : voir `docs/images.md`.

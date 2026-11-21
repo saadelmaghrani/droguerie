@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { ArrowLeft, CircleAlert, ImagePlus, Loader2, Star, Trash2, TriangleAlert } from "lucide-react";
+import { ArrowLeft, CircleAlert, Eye, ImagePlus, Loader2, Star, Trash2, TriangleAlert } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -311,6 +311,21 @@ export function ProductForm({ product, categories }: { product: EditableProduct 
               Liste
             </Link>
           </Button>
+          {product &&
+            (dirty ? (
+              // L'aperçu montre la version enregistrée : on évite de perdre les modifications en cours.
+              <Button type="button" variant="outline" disabled title="Enregistrez d'abord vos modifications">
+                <Eye className="size-4" aria-hidden />
+                Aperçu
+              </Button>
+            ) : (
+              <Button variant="outline" asChild>
+                <Link href={`/admin/produits/${product.id}/apercu`}>
+                  <Eye className="size-4" aria-hidden />
+                  Aperçu
+                </Link>
+              </Button>
+            ))}
           <Button type="submit" disabled={pending}>
             {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
             {product ? "Enregistrer" : "Créer le produit"}

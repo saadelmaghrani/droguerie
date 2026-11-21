@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Ellipsis, EyeOff, FilePen, ImageOff, Loader2, Pencil, Send, Star, Trash2 } from "lucide-react";
+import { Ellipsis, Eye, EyeOff, FilePen, ImageOff, Loader2, Pencil, Send, Star, Trash2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -140,6 +140,12 @@ export function ProductsTable({ rows }: { rows: ProductListRow[] }) {
                             <Link href={`/admin/produits/${row.id}`}>
                               <Pencil aria-hidden />
                               Modifier
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link href={`/admin/produits/${row.id}/apercu`}>
+                              <Eye aria-hidden />
+                              Aperçu
                             </Link>
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
