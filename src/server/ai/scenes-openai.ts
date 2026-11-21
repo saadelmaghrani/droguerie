@@ -1,6 +1,7 @@
-// Photo « fond studio » par OpenAI (option payante). ATTENTION : le modèle REDESSINE l'image ;
-// malgré la consigne stricte ci-dessous, une inscription ou un logo peut être altéré.
-// C'est pourquoi l'interface l'indique et impose la comparaison avant/après.
+// Photos SUPPLÉMENTAIRES par OpenAI (images.edit) : 2 mises en scène de la photo envoyée.
+// ATTENTION : le modèle REDESSINE l'image. Pour limiter l'invention, on ne demande PAS d'autres angles
+// (l'IA devrait alors imaginer les faces cachées) : seulement la MÊME face visible, dans un autre décor.
+// L'interface les présente comme « générées par l'IA », décochées par défaut.
 import "server-only";
 
 import { toFile } from "openai";
@@ -14,14 +15,22 @@ export function aiImageModel(): string {
   return process.env.OPENAI_IMAGE_MODEL?.trim() || DEFAULT_OPENAI_IMAGE_MODEL;
 }
 
-export const STUDIO_PROMPT = `Product photo retouching for an online catalogue. Edit this photo:
-- Replace ONLY the background with a seamless, uniform very light grey studio backdrop (#F4F4F5), soft even lighting,
-  and a subtle natural contact shadow under the product.
-- Center the product with even margins; the whole product must stay visible and uncropped.
-STRICT RULES — the product itself must remain exactly as in the original photo:
+const STRICT_RULES = `STRICT RULES — the product must remain exactly as in the original photo:
+- Show the SAME visible side of the product as in the original. Never show a side, back or top that is not visible in the original.
 - Do not change its shape, proportions, colours, materials, brand, logo, label, printed text, numbers, or packaging.
-- Do not add, remove, translate, retype or "correct" any text or detail. Do not add props, hands, reflections or new objects.
-- If something on the product is blurry or unreadable, leave it as it is; never invent it.`;
+- Do not add, remove, translate, retype or "correct" any text or detail. Do not add other products, hands, people or brand names.
+- If something on the product is blurry or unreadable, leave it as it is; never invent it.
+- The whole product stays visible and uncropped. No text overlay, no watermark.`;
+
+/** Deux mises en scène sobres, adaptées à un catalogue de droguerie. */
+export const SCENE_PROMPTS = [
+  `Catalogue photo of this product placed on a clean light wooden tabletop, against a softly blurred, bright neutral background
+(well-lit shop or workshop ambience). Natural soft daylight, realistic shadow, product centered and in sharp focus.
+${STRICT_RULES}`,
+  `Premium studio photo of this product on a seamless soft light-grey to white gradient backdrop with a subtle glossy floor
+reflection and gentle rim lighting. Product centered, slightly larger in frame, in sharp focus.
+${STRICT_RULES}`,
+] as const;
 
 /** Prix publics (dollars / million de jetons) : [entrée, sortie]. Indicatif. */
 const IMAGE_PRICES: Record<string, [number, number]> = {
@@ -37,7 +46,10 @@ export function estimateImageCostUsd(model: string, inputTokens: number, outputT
   return Math.round(((inputTokens * price[0] + outputTokens * price[1]) / 1_000_000) * 10_000) / 10_000;
 }
 
-export async function studioFromOpenAi(original: Buffer): Promise<{ png: Buffer; model: string; inputTokens: number; outputTokens: number }> {
+export async function sceneFromOpenAi(
+  original: Buffer,
+  index: 0 | 1,
+): Promise<{ png: Buffer; model: string; inputTokens: number; outputTokens: number }> {
   const model = aiImageModel();
   const client = openai(); // lève not_configured si la clé est absente
   const input = await sharp(original).autoOrient().resize(1536, 1536, { fit: "inside", withoutEnlargement: true }).png().toBuffer();
@@ -45,7 +57,7 @@ export async function studioFromOpenAi(original: Buffer): Promise<{ png: Buffer;
     {
       model,
       image: await toFile(input, "produit.png", { type: "image/png" }),
-      prompt: STUDIO_PROMPT,
+      prompt: SCENE_PROMPTS[index],
       size: "1024x1024",
       quality: "high",
       background: "opaque",

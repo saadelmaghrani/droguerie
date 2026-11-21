@@ -4,7 +4,6 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { ChevronRight } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { isAiConfigured } from "@/server/ai/client";
 import { requireAdmin } from "@/server/auth/dal";
 import { getProduct, listCategoryOptions } from "@/server/products/service";
 import { StatusBadge } from "../_components/status-badge";
@@ -47,7 +46,6 @@ async function EditProductContent({ params }: { params: Promise<{ id: string }> 
           images: product.images,
         }}
         categories={categories}
-        aiConfigured={isAiConfigured()}
       />
     </>
   );

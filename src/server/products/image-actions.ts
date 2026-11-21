@@ -15,6 +15,7 @@ import {
   MAX_PRODUCT_IMAGES,
   moveImage,
   replaceProductImage,
+  restoreOriginalImage,
   type ImageServiceResult,
 } from "./images-service";
 
@@ -77,4 +78,12 @@ export async function setPrimaryProductImage(imageId: string): Promise<ImageServ
 
 export async function moveProductImage(imageId: string, direction: "left" | "right"): Promise<ImageServiceResult> {
   return run(imageId, (id) => (direction === "left" || direction === "right" ? moveImage(id, direction) : Promise.resolve(INVALID)));
+}
+
+export async function restoreOriginalProductImage(imageId: string): Promise<ImageServiceResult> {
+  await requireAdmin();
+  if (!uuid.safeParse(imageId).success) return INVALID;
+  const result = await restoreOriginalImage(imageId);
+  if (result.ok) refresh();
+  return result;
 }

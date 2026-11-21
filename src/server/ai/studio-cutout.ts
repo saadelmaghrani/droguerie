@@ -14,7 +14,7 @@ import sharp from "sharp";
 import { AiError } from "./errors";
 
 const SIZE = 1024;
-export const STUDIO_BACKGROUND = { r: 244, g: 244, b: 245 }; // gris très clair uniforme (#F4F4F5)
+export const STUDIO_BACKGROUND = { r: 255, g: 255, b: 255 }; // fond blanc pur uniforme
 /** Le produit occupe au plus 82 % du côté de l'image (marges régulières). */
 const FILL_RATIO = 0.82;
 

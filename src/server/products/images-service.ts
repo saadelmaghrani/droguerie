@@ -4,7 +4,9 @@ import "server-only";
 
 import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
+import sharp from "sharp";
 import { deleteImageFiles, type ProcessedImage } from "@/server/media/images";
+import { localStorage } from "@/server/media/storage";
 
 export const MAX_PRODUCT_IMAGES = 3;
 export type ImageServiceResult = { ok: true; message: string } | { ok: false; message: string };
@@ -137,4 +139,26 @@ export async function productImageKeys(productId: string): Promise<string[]> {
   return (await prisma.productImage.findMany({ where: { productId }, select: { storageKey: true, originalStorageKey: true } }))
     .flatMap((i) => [i.storageKey, i.originalStorageKey])
     .filter((k): k is string => Boolean(k));
+}
+
+/** Photo fond blanc (IA) → retour à la photo d'origine, conservée lors de la création. */
+export async function restoreOriginalImage(imageId: string): Promise<ImageServiceResult> {
+  const image = await prisma.productImage.findUnique({ where: { id: imageId } });
+  if (!image) return NOT_FOUND;
+  if (!image.originalStorageKey) return { ok: true, message: "C'est déjà la photo d'origine." };
+  // Dimensions (pour le ratio d'affichage) relues sur le fichier conservé.
+  const original = await localStorage.read(`${image.originalStorageKey}-orig.webp`);
+  const meta = original ? await sharp(original).metadata() : null;
+  await prisma.productImage.update({
+    where: { id: imageId },
+    data: {
+      storageKey: image.originalStorageKey,
+      originalStorageKey: null,
+      source: "ORIGINAL",
+      width: meta?.width ?? image.width,
+      height: meta?.height ?? image.height,
+    },
+  });
+  await deleteImageFiles(image.storageKey, "product");
+  return { ok: true, message: "Photo d'origine rétablie." };
 }

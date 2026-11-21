@@ -1,43 +1,73 @@
-# Intelligence artificielle (OpenAI)
+# Intelligence artificielle
 
-L'IA propose le **nom** et la **description** d'un produit à partir de sa photo principale et des
-informations déjà saisies. L'admin relit, modifie, puis enregistre lui-même : **rien n'est écrit ni
-publié automatiquement**.
+L'IA n'est proposée **qu'à l'ajout d'un produit** (`/admin/produits/nouveau`), via un seul bouton
+**« Générer avec l'IA »**. La fiche de modification n'a aucun assistant IA (seul le bouton
+« Revenir à la photo d'origine » reste, pour annuler un fond blanc).
 
-## Compte et facturation (à expliquer au client)
+## Parcours
 
-- Le site utilise le compte OpenAI **du magasin**, créé sur https://platform.openai.com.
-- **≠ abonnement ChatGPT** (Plus, Pro…) : celui-ci ne donne pas accès à l'API et ne sert à rien pour le site.
-- Paiement **à l'utilisation** : ajouter du crédit dans Billing ; fixer un plafond dans Billing › Limits.
-- Créer une clé dans API keys, puis la mettre dans le `.env` du serveur et redémarrer le site.
+1. L'admin choisit **une photo** du produit, puis clique sur **Générer avec l'IA**.
+2. Le serveur enregistre la photo puis lance **en parallèle** :
+
+| Résultat | Technique | Fidélité | Coût |
+|---|---|---|---|
+| Photo principale **fond blanc** | Détourage local (modèle ISNet) + pose à l'échelle 1:1 sur `#FFFFFF`, ombre douce | **Pixels du produit identiques** (test automatique : 0 pixel différent) | Gratuit |
+| **2 mises en scène** | OpenAI `images.edit` : même face visible, autre décor (table bois / fond dégradé studio) | **Redessinées** : texte, logo ou forme peuvent varier malgré la consigne stricte | Payant |
+| **Nom + description** | OpenAI (lecture de la photo, Structured Outputs) : français, sans prix ni caractéristique inventée | Texte à relire | Payant |
+
+   Chaque partie peut échouer seule (crédit épuisé, pas de clé…) : les autres restent utilisables.
+   Sans clé OpenAI, seule la photo fond blanc est générée.
+3. **Aperçu complet avant enregistrement** :
+   - photo principale : **Fond blanc** (par défaut) ou **Photo d'origine** ;
+   - mises en scène : case **« Garder cette photo »**, **décochée par défaut** + avertissement ;
+   - nom et description recopiés dans le formulaire, **modifiables**.
+4. **Créer le produit** : le produit est créé, puis **seules les photos choisies** lui sont rattachées.
+   Les fichiers non retenus sont supprimés. Avec le fond blanc, l'**originale est conservée**
+   (`original_storage_key`) : bouton « Revenir à la photo d'origine » sur la fiche.
+
+Pourquoi pas « d'autres angles » : générer une vue de côté ou de dos obligerait l'IA à **inventer** des
+faces jamais photographiées (étiquette arrière, forme). Les mises en scène gardent la face visible.
+
+## Données
+
+- `product_drafts` : la photo envoyée, en attente. `consumed_at` renseigné à la création du produit.
+  Brouillon abandonné (page quittée, « Recommencer ») : fichiers supprimés ; automatiquement après 24 h.
+- `ai_generations` : une ligne par partie (`IMAGE_STUDIO`, `IMAGE_SCENE` ×2, `TEXT`), liée au brouillon
+  (`draft_id`) puis au produit. Statut PENDING → ACCEPTED / REJECTED, ou FAILED avec la cause.
+  Jetons et coût estimé conservés.
+- `product_images.source` : `AI_STUDIO` (fond blanc), `AI_GENERATED` (mise en scène, badge « Générée par l'IA »).
+- Le serveur ne fait jamais confiance aux clés de fichiers envoyées par le navigateur : il ne reçoit que
+  l'identifiant du brouillon et les choix (fond blanc / origine, cases cochées).
+
+## Compte OpenAI et facturation (à expliquer au client)
+
+- Compte OpenAI **du magasin** sur https://platform.openai.com, **≠ abonnement ChatGPT** (qui ne
+  donne pas accès à l'API).
+- Paiement à l'utilisation (Billing) ; fixer un plafond mensuel (Billing › Limits).
+- Clé API dans le `.env` du serveur, puis redémarrer le site.
+- **Paramètres › Intelligence artificielle** : état de la clé, utilisations et coût estimé du mois,
+  dernier problème de compte, bouton **Tester la connexion**.
 
 ## Configuration (`.env`)
 
 | Variable | Rôle |
 |---|---|
-| `OPENAI_API_KEY` | Clé secrète. Vide = IA désactivée (bouton remplacé par une explication). Jamais préfixée `NEXT_PUBLIC_` |
-| `OPENAI_MODEL` | Modèle (défaut `gpt-6.2-sol`, lit les photos). Liste : https://developers.openai.com/api/docs/models |
-| `OPENAI_IMAGE_MODEL` | Modèle de retouche d'image (défaut `gpt-image-2.5-sunburst`) |
+| `OPENAI_API_KEY` | Clé secrète. Vide = parties OpenAI désactivées. Jamais préfixée `NEXT_PUBLIC_` |
+| `OPENAI_MODEL` | Modèle texte + lecture de photo (défaut `gpt-6.2-sol`) |
+| `OPENAI_IMAGE_MODEL` | Modèle des mises en scène (défaut `gpt-image-2.5-sunburst`) |
 | `MODELS_DIR` | Dossier du modèle de détourage (défaut `./storage/models`) |
-| `OPENAI_BASE_URL` | Facultatif, tests uniquement (faux serveur OpenAI) |
+| `OPENAI_BASE_URL` | Tests uniquement (faux serveur OpenAI) |
+
+Modèle de détourage : `npm run ai:model` une fois par machine **et sur le serveur de production**
+(≈ 170 Mo, ISNet, licence Apache-2.0, MD5 vérifié), exécuté par `onnxruntime-node` (MIT).
+`@imgly/background-removal-node` écarté : licence AGPL.
 
 ## Sécurité
 
-- La clé est lue uniquement par `src/server/ai/client.ts` (`import "server-only"` : la compilation
-  échoue si un composant navigateur l'importe). Vérifié par un test : la clé n'apparaît ni dans le HTML ni
-  dans les fichiers JavaScript envoyés au navigateur.
+- Clé lue uniquement par `src/server/ai/client.ts` (`import "server-only"`). Vérifié par test : absente
+  du HTML et du JavaScript envoyés au navigateur.
 - Chaque action (`src/server/ai/actions.ts`) commence par `requireAdmin()`.
-- `store: false` : OpenAI ne conserve pas les échanges.
-
-## Fonctionnement
-
-1. Fiche produit › **Assistant IA** › « Proposer un nom et une description ».
-2. Le serveur envoie la photo principale (800 px, WebP) + nom, catégorie, marque, référence, description
-   **actuels du formulaire** (même non enregistrés), avec un format de réponse imposé (Structured Outputs).
-3. La proposition s'affiche dans des champs modifiables : **Utiliser ce texte** (recopie dans le formulaire),
-   **Autre proposition** ou **Refuser**.
-4. Chaque appel est enregistré dans `ai_generations` : PENDING → ACCEPTED / REJECTED, ou FAILED avec la cause.
-   Jetons et coût estimé y sont conservés.
+- `store: false` pour les appels texte : OpenAI ne conserve pas les échanges.
 
 ## Erreurs
 
@@ -51,52 +81,20 @@ publié automatiquement**.
 | Modèle inconnu | 404 / `model_not_found` | « Vérifiez OPENAI_MODEL » |
 | OpenAI en panne | 5xx | « Momentanément indisponible » |
 | Pas d'internet | connexion | « Impossible de joindre OpenAI » |
-| Réponse inutilisable | refus, coupée, JSON invalide | « Réessayez… » |
-
-Les problèmes **de compte** (clé, crédit, plafond, modèle) s'affichent en orange avec un lien vers
-**Paramètres › Intelligence artificielle**, qui montre aussi : état de la clé, utilisations et coût estimé
-du mois, dernier problème de compte, et un bouton **Tester la connexion** (requête de quelques jetons).
+| Détourage non installé | — | « Lancez npm run ai:model » |
+| Aucun produit net sur la photo | — | « Aucun produit net n'a été détecté… » |
 
 ## Code
 
 | Fichier | Rôle |
 |---|---|
-| `src/server/ai/client.ts` | Lecture de la clé et du modèle, client OpenAI (serveur uniquement) |
-| `src/server/ai/errors.ts` | Erreurs OpenAI → messages en français (testé) |
-| `src/server/ai/product-text-prompt.ts` | Consigne, format de réponse, lecture, coût estimé (testé) |
-| `src/server/ai/product-text.ts` | Appel OpenAI, historique, test de connexion, résumé du mois |
+| `src/server/ai/client.ts` | Clé, modèle, client OpenAI (serveur uniquement) |
+| `src/server/ai/errors.ts` | Erreurs → messages en français (testé) |
+| `src/server/ai/draft-service.ts` | Brouillon : génération parallèle, rattachement des choix, nettoyage |
+| `src/server/ai/studio-cutout.ts` | Détourage + fond blanc (testé : pixels identiques, photo vide refusée) |
+| `src/server/ai/scenes-openai.ts` | 2 mises en scène OpenAI, consigne stricte |
+| `src/server/ai/product-text.ts`, `product-text-prompt.ts` | Nom + description (testé), test de connexion, résumé du mois |
 | `src/server/ai/actions.ts` | Actions serveur (`requireAdmin()` en premier) |
-| `src/app/admin/(protected)/produits/_components/ai-assistant.tsx` | Assistant dans la fiche produit |
+| `src/app/admin/(protected)/produits/_components/new-product-ai.tsx` | Carte « Générer avec l'IA » |
+| `src/app/admin/(protected)/produits/_components/draft-photos.tsx` | Aperçu et choix des photos |
 | `src/app/admin/(protected)/parametres/_components/ai-*.tsx` | Encadré des Paramètres |
-
-## Photo fond studio (photo principale)
-
-Fiche produit › photo principale › **Fond studio**. Deux méthodes au choix :
-
-| | Détourage fidèle (recommandé) | Version OpenAI |
-|---|---|---|
-| Principe | Modèle ISNet sur **notre serveur** : le fond est retiré, le produit posé sur un fond uniforme `#F4F4F5` avec une ombre douce | OpenAI (`images.edit`) régénère la photo sur fond studio, avec une consigne stricte |
-| Produit | **Pixels identiques** à l'original : copiés à l'échelle 1:1, jamais redessinés (vérifié par un test automatique, 0 pixel différent) | **Redessiné** : marque, logo ou texte peuvent être altérés malgré la consigne |
-| Coût | Gratuit (≈ 1 à 4 s de calcul) | Payé par le compte OpenAI du client (coût estimé enregistré) |
-| Limites | Bords imparfaits possibles (objets transparents, fins) | Avertissement affiché : comparer avant d'utiliser |
-
-Validation **obligatoire** :
-1. La variante est créée **à côté** de la photo (fichiers + `ai_generations` PENDING) : la fiche ne change pas.
-2. Fenêtre **avant / après** : « **Utiliser** » ou « **Garder l'originale** ». Fermer la fenêtre = garder l'originale.
-3. « Utiliser » : la photo affiche la variante (`source = AI_STUDIO`), l'**originale est conservée**
-   (`original_storage_key`). Bouton **Originale** sur la photo pour y revenir à tout moment.
-4. Une nouvelle variante repart toujours de la photo **d'origine** (jamais d'une variante).
-5. Variantes jamais validées (onglet fermé) : fichiers supprimés après 24 h.
-
-Installation du modèle (une fois par machine, et sur le serveur de production) : `npm run ai:model`
-→ `storage/models/isnet-general-use.onnx` (≈ 170 Mo, licence Apache-2.0, MD5 vérifié). Exécuté par
-`onnxruntime-node` (MIT). Sans le modèle, la méthode affiche « Le détourage n'est pas installé… ».
-Paquet `@imgly/background-removal-node` écarté : licence AGPL, incompatible avec un site commercial fermé.
-
-| Fichier | Rôle |
-|---|---|
-| `src/server/ai/studio-cutout.ts` | Détourage ISNet + pose sur fond studio (testé : pixels identiques, photo vide refusée) |
-| `src/server/ai/studio-openai.ts` | Variante OpenAI : consigne stricte, modèle `OPENAI_IMAGE_MODEL` |
-| `src/server/ai/studio-service.ts` | Variante en attente, Utiliser / Garder l'originale / Revenir à l'originale |
-| `src/server/ai/studio-actions.ts` | Actions serveur (`requireAdmin()` en premier) |
-| `src/app/admin/(protected)/produits/_components/studio-dialog.tsx` | Fenêtre choix → avant/après → décision |

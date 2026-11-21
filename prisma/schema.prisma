@@ -39,6 +39,7 @@ enum ImageSource {
   ORIGINAL // photo envoyée telle quelle
   ENHANCED // corrections globales (luminosité, netteté…)
   AI_STUDIO // produit détouré posé sur un fond studio
+  AI_GENERATED // mise en scène générée par l'IA (à partir de la photo du produit)
 
   @@map("image_source")
 }
@@ -47,6 +48,7 @@ enum AiGenerationType {
   TEXT // nom + description à partir d'une photo
   IMAGE_ENHANCE // amélioration de la qualité
   IMAGE_STUDIO // détourage + fond studio
+  IMAGE_SCENE // photo supplémentaire générée (mise en scène)
 
   @@map("ai_generation_type")
 }
@@ -238,12 +240,28 @@ model ProductImage {
 
 // ════════════════════════════ INTELLIGENCE ARTIFICIELLE ═════════════════════
 
+/// Brouillon IA d'un NOUVEAU produit : photo envoyée + résultats générés, en attente de
+/// l'enregistrement du produit. Supprimé (avec ses fichiers) après 24 h s'il n'est pas utilisé.
+model ProductDraft {
+  id               String    @id @default(uuid(7)) @db.Uuid
+  originalKey      String    @map("original_key") // photo envoyée par l'admin
+  originalWidth    Int       @map("original_width")
+  originalHeight   Int       @map("original_height")
+  adminUserId      String?   @map("admin_user_id") @db.Uuid
+  createdAt        DateTime  @default(now()) @map("created_at")
+  consumedAt       DateTime? @map("consumed_at") // produit enregistré avec ce brouillon
+
+  @@index([createdAt])
+  @@map("product_drafts")
+}
+
 /// Historique de chaque appel IA : traçabilité, validation et suivi des coûts.
 model AiGeneration {
   id               String             @id @default(uuid(7)) @db.Uuid
   type             AiGenerationType
   status           AiGenerationStatus @default(PENDING)
   productId        String?            @map("product_id") @db.Uuid
+  draftId          String?            @map("draft_id") @db.Uuid // brouillon de nouveau produit
   product          Product?           @relation(fields: [productId], references: [id], onDelete: SetNull)
   adminUserId      String?            @map("admin_user_id") @db.Uuid
   adminUser        AdminUser?         @relation(fields: [adminUserId], references: [id], onDelete: SetNull)
@@ -261,6 +279,7 @@ model AiGeneration {
   decidedAt        DateTime?          @map("decided_at")
 
   @@index([createdAt]) // somme des coûts du mois / du jour
+  @@index([draftId])
   @@index([productId])
   @@map("ai_generations")
 }

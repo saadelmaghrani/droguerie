@@ -26,7 +26,9 @@ import { PRODUCT_STATUSES, STATUS_INFO, type ProductStatusValue } from "@/lib/pr
 import { slugify } from "@/lib/slug";
 import { removeProduct, saveProduct, type ProductFormState, type ProductFormValues } from "@/server/products/actions";
 import { uploadProductImage } from "@/server/products/image-actions";
-import { AiAssistant } from "./ai-assistant";
+import { attachProductDraftAction } from "@/server/ai/actions";
+import { DraftPhotos, type DraftChoice } from "./draft-photos";
+import { NewProductAi, type ProductDraft } from "./new-product-ai";
 import { PendingImages, type PendingImage } from "./pending-images";
 import { ProductImages, type ProductImage } from "./product-images";
 
@@ -71,6 +73,10 @@ export function ProductForm({
   // Création : photos choisies avant l'enregistrement, envoyées juste après la création du produit.
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
   const [uploadProgress, setUploadProgress] = useState<string | null>(null);
+  // Création avec l'IA : proposition générée (photos + texte) et choix de l'admin.
+  const [draft, setDraft] = useState<ProductDraft | null>(null);
+  const [draftChoice, setDraftChoice] = useState<DraftChoice>({ main: "original", keepScenes: [] });
+  const [generating, setGenerating] = useState(false);
   const [slugEdited, setSlugEdited] = useState(Boolean(product));
   const set = <K extends keyof ProductFormValues>(key: K, value: ProductFormValues[K]) => setValues((v) => ({ ...v, [key]: value }));
 
@@ -84,9 +90,19 @@ export function ProductForm({
     if (!state.created) return;
     // Création réussie → envoi des photos choisies, puis page de modification du nouveau produit.
     const productId = state.id;
-    const files = pendingImages.map((i) => i.file);
+    const files = draft ? [] : pendingImages.map((i) => i.file);
     let cancelled = false;
     (async () => {
+      if (draft) {
+        // Photos générées : seules celles choisies par l'admin sont rattachées au produit.
+        setUploadProgress("Ajout des photos choisies…");
+        try {
+          const result = await attachProductDraftAction(productId, draft.draftId, draftChoice);
+          if (!result.ok) toast.error(result.message);
+        } catch {
+          toast.error("Photos non ajoutées. Vous pourrez les ajouter depuis la fiche.");
+        }
+      }
       for (const [index, file] of files.entries()) {
         if (cancelled) return;
         setUploadProgress(`Envoi des photos (${index + 1}/${files.length})…`);
@@ -104,7 +120,7 @@ export function ProductForm({
     return () => {
       cancelled = true;
     };
-    // pendingImages volontairement absent : seul un nouveau résultat d'enregistrement déclenche l'envoi.
+    // pendingImages / draft volontairement absents : seul un nouveau résultat d'enregistrement déclenche l'envoi.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state, router]);
 
@@ -135,19 +151,22 @@ export function ProductForm({
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         {/* Colonne principale : contenu de la fiche */}
         <div className="grid content-start gap-6">
-          {product && (
-            <AiAssistant
-              productId={product.id}
+          {!product && (
+            <NewProductAi
               configured={aiConfigured}
-              hasPhoto={product.imageCount > 0}
-              hints={{
-                name: values.name,
-                description: values.description,
-                brand: values.brand,
-                reference: values.reference,
-                categoryId: values.categoryId,
+              draft={draft}
+              hints={{ name: values.name, categoryId: values.categoryId }}
+              disabled={pending || uploadProgress !== null}
+              onGenerating={setGenerating}
+              onGenerated={(result) => {
+                setDraft(result);
+                setDraftChoice({ main: result.studio.ok ? "studio" : "original", keepScenes: result.scenes.map(() => false) });
+                if (result.text.ok) {
+                  const { name, description } = result.text.value;
+                  setValues((v) => ({ ...v, name, description, slug: slugEdited ? v.slug : slugify(name) }));
+                }
               }}
-              onApply={({ name, description }) => setValues((v) => ({ ...v, name, description }))}
+              onReset={() => setDraft(null)}
             />
           )}
           <Card>
@@ -237,9 +256,13 @@ export function ProductForm({
             </CardHeader>
             <CardContent>
               {product ? (
-                <ProductImages productId={product.id} productName={product.name} images={product.images} aiConfigured={aiConfigured} />
+                <ProductImages productId={product.id} productName={product.name} images={product.images} />
               ) : (
-                <PendingImages images={pendingImages} onChange={setPendingImages} disabled={pending || uploadProgress !== null} />
+                draft ? (
+                  <DraftPhotos draft={draft} choice={draftChoice} onChange={setDraftChoice} disabled={pending || uploadProgress !== null} />
+                ) : (
+                  <PendingImages images={pendingImages} onChange={setPendingImages} disabled={pending || uploadProgress !== null || generating} />
+                )
               )}
             </CardContent>
           </Card>
@@ -283,7 +306,7 @@ export function ProductForm({
                   La catégorie « {category.name} » est masquée : ce produit ne sera pas visible tant qu&apos;elle l&apos;est.
                 </p>
               )}
-              {values.status === "PUBLISHED" && (product?.imageCount ?? pendingImages.length) === 0 && (
+              {values.status === "PUBLISHED" && (product?.imageCount ?? (draft ? 1 : pendingImages.length)) === 0 && (
                 <p className="flex items-start gap-1.5 text-sm text-amber-700">
                   <TriangleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden />
                   Ce produit n&apos;a pas encore de photo.
@@ -375,7 +398,7 @@ export function ProductForm({
                 </Link>
               </Button>
             ))}
-          <Button type="submit" disabled={pending || uploadProgress !== null}>
+          <Button type="submit" disabled={pending || uploadProgress !== null || generating}>
             {(pending || uploadProgress !== null) && <Loader2 className="size-4 animate-spin" aria-hidden />}
             {product ? "Enregistrer" : "Créer le produit"}
           </Button>

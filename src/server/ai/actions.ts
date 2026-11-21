@@ -1,47 +1,50 @@
 "use server";
 // Actions serveur de l'IA. Points d'entrée publics : requireAdmin() en premier.
-// La clé OpenAI reste sur le serveur : le navigateur ne reçoit que la suggestion ou un message d'erreur.
+// La clé OpenAI reste sur le serveur : le navigateur ne reçoit que les résultats ou un message d'erreur.
+//
+// L'IA n'est proposée QUE sur la page « Nouveau produit » (bouton « Générer avec l'IA »).
 
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/server/auth/dal";
-import { decideProductText, suggestProductText, testAiConnection, type SuggestResult } from "./product-text";
+import { readUploadedFile } from "@/server/media/images";
+import { attachDraftToProduct, createProductDraft, discardDraft, type DraftResult } from "./draft-service";
+import { testAiConnection } from "./product-text";
 
-const hintsSchema = z.object({
-  name: z.string().max(500),
-  description: z.string().max(6000),
-  brand: z.string().max(200),
-  reference: z.string().max(200),
-  categoryId: z.union([z.uuid(), z.literal("")]),
-});
+const uuid = z.uuid();
 
-export type ProductTextHintsInput = z.infer<typeof hintsSchema>;
-
-/** Propose nom + description. Les valeurs ACTUELLES du formulaire servent d'indices (même non enregistrées). */
-export async function suggestProductTextAction(productId: string, hints: ProductTextHintsInput): Promise<SuggestResult> {
+/** Un seul clic : photo fond blanc + 2 mises en scène + nom/description. Rien n'est enregistré sur un produit. */
+export async function generateProductDraftAction(formData: FormData): Promise<DraftResult> {
   const admin = await requireAdmin();
-  const id = z.uuid().safeParse(productId);
-  const parsed = hintsSchema.safeParse(hints);
-  if (!id.success || !parsed.success) return { ok: false, kind: "bad_response", message: "Requête invalide.", accountAction: false };
-
-  const [product, category] = await Promise.all([
-    prisma.product.findUnique({ where: { id: id.data }, select: { id: true } }),
-    parsed.data.categoryId
-      ? prisma.category.findUnique({ where: { id: parsed.data.categoryId }, select: { name: true } })
-      : Promise.resolve(null),
-  ]);
-  if (!product) return { ok: false, kind: "bad_response", message: "Ce produit n'existe plus.", accountAction: false };
-
-  const { name, description, brand, reference } = parsed.data;
-  return suggestProductText(product.id, { name, description, brand, reference, categoryName: category?.name ?? "" }, admin.id);
+  if (!(formData instanceof FormData)) return { ok: false, message: "Requête invalide." };
+  const upload = readUploadedFile(formData.get("file"));
+  if (!upload.ok) return { ok: false, message: upload.error };
+  const name = String(formData.get("name") ?? "").slice(0, 120);
+  const categoryId = String(formData.get("categoryId") ?? "");
+  const category = uuid.safeParse(categoryId).success
+    ? await prisma.category.findUnique({ where: { id: categoryId }, select: { name: true } })
+    : null;
+  return createProductDraft(upload.file, { name, description: "", brand: "", reference: "", categoryName: category?.name ?? "" }, admin.id);
 }
 
-/** L'admin a utilisé (accepted = true) ou refusé la suggestion. */
-export async function decideProductTextAction(generationId: string, accepted: boolean): Promise<{ ok: boolean }> {
+const choiceSchema = z.object({
+  main: z.enum(["studio", "original"]),
+  keepScenes: z.array(z.boolean()).max(2),
+});
+
+/** Après « Créer le produit » : rattache les photos choisies par l'admin. */
+export async function attachProductDraftAction(productId: string, draftId: string, choice: z.infer<typeof choiceSchema>) {
   await requireAdmin();
-  const id = z.uuid().safeParse(generationId);
-  if (!id.success || typeof accepted !== "boolean") return { ok: false };
-  return { ok: await decideProductText(id.data, accepted) };
+  const parsed = choiceSchema.safeParse(choice);
+  if (!uuid.safeParse(productId).success || !uuid.safeParse(draftId).success || !parsed.success) {
+    return { ok: false as const, message: "Requête invalide." };
+  }
+  return attachDraftToProduct(productId, draftId, parsed.data);
+}
+
+export async function discardProductDraftAction(draftId: string): Promise<void> {
+  await requireAdmin();
+  if (uuid.safeParse(draftId).success) await discardDraft(draftId);
 }
 
 export async function testAiConnectionAction() {
