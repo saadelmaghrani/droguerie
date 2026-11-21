@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { submitWithoutReset } from "@/lib/forms";
 import { formatPhone } from "@/lib/phone";
 import { isValidSlug, slugify } from "@/lib/slug";
 import { saveCategory, type CategoryFormState } from "@/server/categories/actions";
@@ -110,7 +111,9 @@ function CategoryForm({
   const hidesProducts = category && !isActive && category.isActive && category.productCount > 0;
 
   return (
-    <form action={formAction} className="grid gap-5" noValidate>
+    // onSubmit (et non action) : évite la réinitialisation automatique qui annulait
+    // l'interrupteur « Visible » et la liste WhatsApp après une erreur (voir src/lib/forms.ts).
+    <form onSubmit={submitWithoutReset(formAction)} className="grid gap-5" noValidate>
       <input type="hidden" name="id" value={category?.id ?? ""} />
       <input type="hidden" name="whatsappNumberId" value={whatsappId} />
       <input type="hidden" name="isActive" value={isActive ? "on" : ""} />
