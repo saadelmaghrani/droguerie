@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
+// La variable CSS doit s'appeler --font-sans : c'est le nom attendu par le thème
+// shadcn/ui dans globals.css (@theme inline → font-sans utilise var(--font-sans)).
 const geistSans = Geist({
-  variable: "--font-geist-sans",
+  variable: "--font-sans",
   subsets: ["latin"],
 });
 

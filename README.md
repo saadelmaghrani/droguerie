@@ -8,7 +8,7 @@ Cahier des charges : [`docs/cahier_des_charges.pdf`](docs/cahier_des_charges.pdf
 
 ## Stack
 
-Next.js 16 (App Router, TypeScript) · Tailwind CSS 4 · PostgreSQL 18 · Prisma 7 · Docker Compose ·
+Next.js 16 (App Router, TypeScript) · Tailwind CSS 4 · shadcn/ui · PostgreSQL 18 · Prisma 7 · Docker Compose ·
 VPS Hetzner (Caddy) en production.
 
 ## Prérequis
@@ -61,6 +61,7 @@ Arrêter toujours le serveur avec `Ctrl + C` plutôt que de fermer brutalement l
 |---|---|
 | [`docs/database.md`](docs/database.md) | Tables, règles métier, recherche, migrations |
 | [`docs/authentication.md`](docs/authentication.md) | Sessions admin, sécurité, règles à respecter |
+| [`docs/admin-ui.md`](docs/admin-ui.md) | Interface admin : structure, ajouter une page, thème |
 
 ## Variables d'environnement
 
