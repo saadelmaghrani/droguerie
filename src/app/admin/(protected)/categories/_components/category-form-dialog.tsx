@@ -16,7 +16,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { CATEGORY_ICON_KEYS, CATEGORY_ICONS, CategoryIcon, suggestCategoryIcon, type CategoryIconKey } from "@/lib/category-icons";
 import { submitWithoutReset } from "@/lib/forms";
+import { cn } from "@/lib/utils";
 import { formatPhone } from "@/lib/phone";
 import { isValidSlug, slugify } from "@/lib/slug";
 import { saveCategory, type CategoryFormState } from "@/server/categories/actions";
@@ -88,6 +90,8 @@ function CategoryForm({
   const [description, setDescription] = useState(category?.description ?? "");
   const [whatsappId, setWhatsappId] = useState(category?.whatsappNumberId ?? DEFAULT_WHATSAPP);
   const [isActive, setIsActive] = useState(category?.isActive ?? true);
+  // "" = pictogramme suggéré automatiquement d'après le nom.
+  const [icon, setIcon] = useState<string>(category?.icon ?? "");
 
   const successId = state?.ok ? state.submissionId : null;
   useEffect(() => {
@@ -117,6 +121,7 @@ function CategoryForm({
       <input type="hidden" name="id" value={category?.id ?? ""} />
       <input type="hidden" name="whatsappNumberId" value={whatsappId} />
       <input type="hidden" name="isActive" value={isActive ? "on" : ""} />
+      <input type="hidden" name="icon" value={icon} />
 
       <div className="grid gap-2">
         <Label htmlFor="cat-name">Nom</Label>
@@ -195,6 +200,8 @@ function CategoryForm({
         <FieldError id="cat-description-error" message={descriptionError} />
       </div>
 
+      <IconPicker value={icon} onChange={setIcon} name={name} disabled={pending} />
+
       <div className="grid gap-2">
         <Label htmlFor="cat-whatsapp">Numéro WhatsApp</Label>
         <Select value={whatsappId} onValueChange={setWhatsappId} disabled={pending}>
@@ -260,5 +267,36 @@ function CategoryForm({
         </Button>
       </DialogFooter>
     </form>
+  );
+}
+
+/** Choix du pictogramme : « Automatique » (suggéré d'après le nom) ou une icône précise. */
+function IconPicker({ value, onChange, name, disabled }: { value: string; onChange: (icon: string) => void; name: string; disabled: boolean }) {
+  const suggested = suggestCategoryIcon(name);
+  const option = (key: string, label: string, icon: CategoryIconKey) => (
+    <label
+      key={key || "auto"}
+      title={label}
+      className={cn(
+        "flex cursor-pointer flex-col items-center gap-1 rounded-lg border p-2 text-center text-[11px] leading-tight transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring",
+        value === key ? "border-primary bg-primary/5 text-foreground" : "text-muted-foreground hover:bg-muted/50",
+      )}
+    >
+      <input type="radio" name="cat-icon" value={key} checked={value === key} onChange={() => onChange(key)} disabled={disabled} className="sr-only" />
+      <CategoryIcon icon={icon} className="size-6 text-foreground" />
+      <span className="line-clamp-2">{label}</span>
+    </label>
+  );
+  return (
+    <fieldset className="grid gap-2">
+      <legend className="mb-2 text-sm font-medium">Pictogramme</legend>
+      <div className="grid max-h-56 grid-cols-4 gap-1.5 overflow-y-auto rounded-lg border p-1.5 sm:grid-cols-6">
+        {option("", "Automatique", suggested)}
+        {CATEGORY_ICON_KEYS.map((key) => option(key, CATEGORY_ICONS[key].label, key))}
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Affiché dans le menu du site. « Automatique » choisit d&apos;après le nom (ici : {CATEGORY_ICONS[suggested].label.toLowerCase()}).
+      </p>
+    </fieldset>
   );
 }

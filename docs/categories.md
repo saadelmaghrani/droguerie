@@ -9,6 +9,7 @@ Page d'administration : `/admin/categories`. Un seul niveau (pas de sous-catégo
 | Nom | 2 à 60 caractères, unique **sans tenir compte des majuscules** |
 | Adresse (slug) | `/categories/<slug>` : minuscules, chiffres, tirets ; unique ; 80 caractères max |
 | Description | Facultative, 500 caractères max |
+| Pictogramme | Icône affichée dans le menu mobile, les pastilles du catalogue et les tuiles de l'accueil. « Automatique » (par défaut) = suggérée d'après le nom (`src/lib/category-icons.tsx`, testé) ; sinon choisie parmi ~50 icônes de droguerie |
 | Numéro WhatsApp | Un numéro précis, ou « numéro par défaut » (`whatsapp_number_id` = NULL) |
 | Visible sur le site | Interrupteur (`is_active`) |
 | Ordre | Boutons ↑ ↓ (`sort_order`, renuméroté 0, 1, 2… à chaque déplacement) |

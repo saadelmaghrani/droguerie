@@ -7,6 +7,7 @@ import "server-only";
 
 import { cacheLife, cacheTag } from "next/cache";
 import { Prisma } from "@/generated/prisma/client";
+import { categoryIconKey, type CategoryIconKey } from "@/lib/category-icons";
 import { DEFAULT_PRIMARY_COLOR } from "@/lib/color";
 import { prisma } from "@/lib/prisma";
 import { pickWhatsappPhone } from "@/lib/product-visibility";
@@ -84,6 +85,8 @@ export type PublicCategory = {
   name: string;
   slug: string;
   description: string | null;
+  /** Pictogramme à afficher (choix de l'admin ou suggestion d'après le nom). */
+  icon: CategoryIconKey;
   productCount: number;
   /** Photo principale d'un produit de la catégorie (vignette), ou null. */
   coverKey: string | null;
@@ -93,8 +96,8 @@ export type PublicCategory = {
 export async function getPublicCategories(): Promise<PublicCategory[]> {
   "use cache";
   cached();
-  const rows = await prisma.$queryRaw<{ id: string; name: string; slug: string; description: string | null; product_count: bigint; cover_key: string | null }[]>`
-    SELECT c.id, c.name, c.slug, c.description,
+  const rows = await prisma.$queryRaw<{ id: string; name: string; slug: string; description: string | null; icon: string | null; product_count: bigint; cover_key: string | null }[]>`
+    SELECT c.id, c.name, c.slug, c.description, c.icon,
       count(p.id) AS product_count,
       (SELECT i.storage_key FROM products p2
          JOIN product_images i ON i.product_id = p2.id AND i.position = 0
@@ -112,6 +115,7 @@ export async function getPublicCategories(): Promise<PublicCategory[]> {
     name: r.name,
     slug: r.slug,
     description: r.description,
+    icon: categoryIconKey(r.icon, r.name),
     productCount: Number(r.product_count),
     coverKey: r.cover_key,
   }));

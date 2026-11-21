@@ -16,6 +16,7 @@ import {
   Trash2,
   TriangleAlert,
 } from "lucide-react";
+import { CategoryIcon, categoryIconKey } from "@/lib/category-icons";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -174,6 +175,9 @@ export function CategoriesManager({
                         </Button>
                       </div>
 
+                      <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted" aria-hidden>
+                        <CategoryIcon icon={categoryIconKey(row.icon, row.name)} className="size-5" />
+                      </span>
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <h3 className="truncate font-medium">{row.name}</h3>

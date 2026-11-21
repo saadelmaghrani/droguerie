@@ -178,6 +178,7 @@ model Category {
   slug             String          @unique // utilisé dans l'URL : /categories/peinture
   description      String?
   imageKey         String?         @map("image_key")
+  icon             String? // pictogramme (clé de src/lib/category-icons.ts) ; null = suggéré d'après le nom
   sortOrder        Int             @default(0) @map("sort_order")
   isActive         Boolean         @default(true) @map("is_active")
   // Supprimer un numéro ne supprime pas la catégorie : elle retombe sur le numéro par défaut.

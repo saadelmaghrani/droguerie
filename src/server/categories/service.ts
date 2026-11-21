@@ -13,6 +13,8 @@ export type CategoryRow = {
   name: string;
   slug: string;
   description: string | null;
+  /** Pictogramme choisi par l'admin (null = suggéré d'après le nom). */
+  icon: string | null;
   isActive: boolean;
   whatsappNumberId: string | null;
   whatsapp: { label: string; phone: string; isActive: boolean } | null;
@@ -26,6 +28,7 @@ export type CategoryInput = {
   name: string;
   slug: string;
   description: string | null;
+  icon: string | null;
   whatsappNumberId: string | null;
   isActive: boolean;
 };
@@ -54,6 +57,7 @@ export async function listCategories(): Promise<CategoryRow[]> {
     name: c.name,
     slug: c.slug,
     description: c.description,
+    icon: c.icon,
     isActive: c.isActive,
     whatsappNumberId: c.whatsappNumberId,
     whatsapp: c.whatsappNumber,

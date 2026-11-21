@@ -4,6 +4,7 @@
 import { refresh } from "next/cache";
 import { invalidateCatalogue } from "@/server/catalogue/cache";
 import { z } from "zod";
+import { CATEGORY_ICON_KEYS } from "@/lib/category-icons";
 import { isValidSlug, SLUG_MAX_LENGTH } from "@/lib/slug";
 import { requireAdmin } from "@/server/auth/dal";
 import {
@@ -20,6 +21,7 @@ export type CategoryFormValues = {
   name: string;
   slug: string;
   description: string;
+  icon: string;
   whatsappNumberId: string;
   isActive: boolean;
 };
@@ -46,6 +48,8 @@ const formSchema = z.object({
     .refine(isValidSlug, "Adresse invalide : minuscules, chiffres et tirets uniquement (ex. produits-entretien)."),
   description: z.string().trim().max(500, "La description ne doit pas dépasser 500 caractères."),
   whatsappNumberId: z.union([z.uuid(), z.literal(DEFAULT_WHATSAPP)], { error: "Numéro WhatsApp invalide." }),
+  // "" = pictogramme suggéré automatiquement d'après le nom.
+  icon: z.union([z.enum(CATEGORY_ICON_KEYS), z.literal("")], { error: "Pictogramme invalide." }),
 });
 
 export async function saveCategory(_previous: CategoryFormState, formData: FormData): Promise<CategoryFormState> {
@@ -57,6 +61,7 @@ export async function saveCategory(_previous: CategoryFormState, formData: FormD
     slug: text("slug", 200),
     description: text("description", 2000),
     whatsappNumberId: text("whatsappNumberId", 100) || DEFAULT_WHATSAPP,
+    icon: text("icon", 40),
     // Interrupteur : présent dans le formulaire uniquement s'il est activé.
     isActive: formData.get("isActive") === "on",
   };
@@ -74,11 +79,12 @@ export async function saveCategory(_previous: CategoryFormState, formData: FormD
     return { ok: false, message: "Veuillez corriger les champs indiqués.", fieldErrors, values };
   }
 
-  const { id, name, slug, description, whatsappNumberId } = parsed.data;
+  const { id, name, slug, description, whatsappNumberId, icon } = parsed.data;
   const data = {
     name,
     slug,
     description: description || null,
+    icon: icon || null,
     whatsappNumberId: whatsappNumberId === DEFAULT_WHATSAPP ? null : whatsappNumberId,
     isActive: values.isActive,
   };
