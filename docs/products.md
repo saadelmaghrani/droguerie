@@ -53,6 +53,28 @@ Page `/admin/produits/<id>/apercu` (bouton « Aperçu » de la fiche, ou menu «
 - Bouton WhatsApp : numéro de la catégorie s'il est actif, sinon le numéro par défaut ;
   message prérempli « Bonjour, je souhaite connaître le prix et la disponibilité de : <nom> (réf. <référence>) ».
 
+## Import CSV
+
+Page `/admin/produits/import` (bouton « Importer » de la liste). Modèle : `/admin/produits/import/modele`.
+
+1. **Analyse** : le fichier est lu et vérifié, **rien n'est enregistré**. Écran : nombre de créations,
+   de mises à jour et de lignes en erreur (avec numéro de ligne Excel et explication).
+2. **Import** : le navigateur renvoie le même fichier ; le serveur le ré-analyse puis écrit toutes les
+   lignes valides en **une transaction** (tout ou rien). Les lignes en erreur sont ignorées.
+
+| Règle | Détail |
+|---|---|
+| Format | CSV « ; », « , » ou tabulation (détecté) ; UTF-8 ou Windows-1252 (Excel français) ; 5 Mo et 5000 lignes max |
+| Colonnes | Reconnues sans accents ni majuscules : Nom, Catégorie, Description, Référence, Marque, Statut, Mis en avant. Autres colonnes ignorées (signalées) |
+| Prix | Une colonne Prix/Tarif est signalée et **jamais lue** |
+| Création | Nom et Catégorie obligatoires ; Statut par défaut : Brouillon ; adresse générée (suffixe -2, -3… si déjà prise) |
+| Mise à jour | Si la **Référence** existe déjà (majuscules ignorées). Case vide = valeur inchangée. L'adresse et la référence ne sont jamais modifiées |
+| Catégorie | Nom ou adresse d'une catégorie existante (accents/majuscules ignorés). Une catégorie inconnue n'est pas créée : erreur |
+| Référence en double dans le fichier | Erreur sur les lignes suivantes |
+| Photos | Non importées : à ajouter depuis chaque fiche |
+
+Mesuré en local : 2000 lignes analysées en 0,2 s, importées en 0,8 s.
+
 ## Code
 
 | Fichier | Rôle |
@@ -62,9 +84,12 @@ Page `/admin/produits/<id>/apercu` (bouton « Aperçu » de la fiche, ou menu «
 | `src/lib/product-status.ts` | Libellés des statuts et correspondance avec l'URL |
 | `src/server/products/preview.ts` | Données de la fiche publique (photos, numéro WhatsApp résolu) |
 | `src/lib/product-visibility.ts` | Numéro WhatsApp, message prérempli, raisons de non-visibilité (testé) |
+| `src/lib/csv.ts` | Lecture CSV (séparateur, encodage, guillemets) et écriture (testé) |
+| `src/lib/product-import.ts` | Colonnes et validation des lignes importées (testé) |
+| `src/server/products/import.ts`, `import-actions.ts` | Analyse et import en transaction |
 | `src/components/catalogue/` | Fiche produit et galerie du site (réutilisées par l'aperçu) |
 | `src/app/admin/(protected)/produits/` | Liste, filtres, tableau, fiche (création / modification), aperçu |
 
 ## À venir
 
-Import CSV : tâche 12 (suite). Photos : voir `docs/images.md`.
+Photos : voir `docs/images.md`.

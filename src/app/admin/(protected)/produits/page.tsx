@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
-import { ChevronLeft, ChevronRight, Package, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, FileUp, Package, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -132,12 +132,20 @@ export default function ProductsPage({ searchParams }: { searchParams: SearchPar
         title="Produits"
         description="Recherchez, créez et publiez les produits du catalogue."
         actions={
+          <>
+          <Button variant="outline" asChild>
+            <Link href="/admin/produits/import">
+              <FileUp className="size-4" aria-hidden />
+              Importer
+            </Link>
+          </Button>
           <Button asChild>
             <Link href="/admin/produits/nouveau">
               <Plus className="size-4" aria-hidden />
               Nouveau produit
             </Link>
           </Button>
+          </>
         }
       />
       <Suspense fallback={<ProductsSkeleton />}>
