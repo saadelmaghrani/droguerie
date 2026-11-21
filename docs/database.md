@@ -78,7 +78,7 @@ obligatoire pour l'utiliser dans un index.
 
 ## Modifier le schéma : points d'attention
 
-- Prisma 7 ne régénère plus le client après `migrate dev` : le script `db:migrate` le fait.
+- Prisma 7 ne régénère plus le client après `migrate dev` : le script `db:migrate` lance `generate` puis `migrate dev` (dans cet ordre, pour que `npm run db:migrate -- --name xxx` transmette bien le nom).
 - Pour une règle SQL que Prisma ne gère pas : `npx prisma migrate dev --create-only --name <nom>`,
   compléter le fichier SQL, puis `npm run db:migrate`.
 - Vérifier ensuite que Prisma ne voit pas de dérive (le résultat doit être une migration vide) :
