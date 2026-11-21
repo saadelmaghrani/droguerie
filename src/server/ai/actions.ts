@@ -10,6 +10,7 @@ import { requireAdmin } from "@/server/auth/dal";
 import { invalidateCatalogue } from "@/server/catalogue/cache";
 import { readUploadedFile } from "@/server/media/images";
 import { attachDraftToProduct, createProductDraft, discardDraft, EXTRA_SLOTS, MAX_EXTRAS, type DraftResult } from "./draft-service";
+import { isAiFeatureEnabled } from "./client";
 import { testAiConnection } from "./product-text";
 
 const uuid = z.uuid();
@@ -17,6 +18,7 @@ const uuid = z.uuid();
 /** Un seul clic : fond blanc + 2 montages locaux + nom/description (+ 2 mises en scène IA si demandées). Rien n'est enregistré sur un produit. */
 export async function generateProductDraftAction(formData: FormData): Promise<DraftResult> {
   const admin = await requireAdmin();
+  if (!isAiFeatureEnabled()) return { ok: false, message: "L'IA est en pause (AI_ENABLED n'est pas activé dans le .env)." };
   if (!(formData instanceof FormData)) return { ok: false, message: "Requête invalide." };
   const upload = readUploadedFile(formData.get("file"));
   if (!upload.ok) return { ok: false, message: upload.error };

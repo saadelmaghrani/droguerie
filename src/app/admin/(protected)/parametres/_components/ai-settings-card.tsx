@@ -2,7 +2,7 @@
 // dernière erreur de compte (crédit épuisé…) et bouton de test. Composant serveur.
 import { CircleCheck, CircleX, TriangleAlert } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { aiModel, aiMonthlyBudgetUsd, isAiConfigured } from "@/server/ai/client";
+import { aiModel, aiMonthlyBudgetUsd, isAiConfigured, isAiFeatureEnabled } from "@/server/ai/client";
 import { AI_MESSAGES } from "@/server/ai/errors";
 import { getAiUsageSummary } from "@/server/ai/product-text";
 import { AiTestButton } from "./ai-test-button";
@@ -12,6 +12,7 @@ const date = new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "
 
 export async function AiSettingsCard() {
   const configured = isAiConfigured();
+  const enabled = isAiFeatureEnabled();
   const usage = await getAiUsageSummary(configured);
   const budget = aiMonthlyBudgetUsd();
   const budgetUsed = budget > 0 ? Math.min(100, Math.round((usage.monthCostUsd / budget) * 100)) : 100;
@@ -22,6 +23,12 @@ export async function AiSettingsCard() {
         <CardTitle>Intelligence artificielle (OpenAI)</CardTitle>
       </CardHeader>
       <CardContent className="grid gap-4 text-sm">
+        {!enabled && (
+          <p className="rounded-lg border bg-muted/50 px-3 py-2 text-muted-foreground">
+            <strong className="text-foreground">IA en pause.</strong> Le bouton « Générer avec l&apos;IA » est masqué sur la page
+            Nouveau produit. Pour l&apos;activer : <code>AI_ENABLED=true</code> dans le fichier <code>.env</code>, puis redémarrer le site.
+          </p>
+        )}
         <p className="flex items-center gap-2 font-medium">
           {configured ? (
             <>

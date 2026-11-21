@@ -50,10 +50,13 @@ function FieldError({ id, message }: { id: string; message?: string }) {
 export function ProductForm({
   product,
   categories,
+  aiEnabled = false,
   aiConfigured = false,
 }: {
   product: EditableProduct | null;
   categories: CategoryOption[];
+  /** IA activée (AI_ENABLED) : affiche « Générer avec l'IA » sur la page Nouveau produit. */
+  aiEnabled?: boolean;
   aiConfigured?: boolean;
 }) {
   const router = useRouter();
@@ -179,7 +182,7 @@ export function ProductForm({
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         {/* Colonne principale : contenu de la fiche */}
         <div className="grid content-start gap-6">
-          {!product && (
+          {!product && aiEnabled && (
             <NewProductAi
               configured={aiConfigured}
               draft={draft}

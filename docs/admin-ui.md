@@ -22,8 +22,7 @@ src/app/admin/
         ├── admin-nav.tsx       liens + lien actif (aria-current)
         ├── mobile-nav.tsx      panneau latéral mobile
         ├── admin-user-menu.tsx utilisateur connecté + déconnexion
-        ├── page-header.tsx     titre / description / actions d'une page
-        └── coming-soon.tsx     contenu provisoire des sections à venir
+        └── page-header.tsx     titre / description / actions d'une page
 ```
 
 ## Ajouter une page admin
@@ -68,3 +67,9 @@ couleurs fixes : la couleur principale du site deviendra personnalisable depuis 
 
 La police Geist est déclarée dans `src/app/layout.tsx` sous la variable `--font-sans`
 (nom attendu par le thème shadcn).
+
+## Erreurs inattendues
+
+`error.tsx` dans `src/app/admin/(protected)/` et `src/app/(site)/` : message clair + bouton « Réessayer »
+(`src/components/error-state.tsx`), le menu / l'en-tête restent affichés. Le détail technique n'est jamais
+montré ; le code « digest » permet de retrouver l'erreur dans les journaux du serveur.

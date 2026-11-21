@@ -19,6 +19,14 @@ export function aiModel(): string {
   return process.env.OPENAI_MODEL?.trim() || DEFAULT_OPENAI_MODEL;
 }
 
+/**
+ * Interrupteur général de l'IA (bouton « Générer avec l'IA » de la page Nouveau produit).
+ * En pause par défaut : AI_ENABLED=true dans le .env pour l'activer. Le reste du site n'en dépend pas.
+ */
+export function isAiFeatureEnabled(): boolean {
+  return process.env.AI_ENABLED?.trim().toLowerCase() === "true";
+}
+
 export function isAiConfigured(): boolean {
   return Boolean(process.env.OPENAI_API_KEY?.trim());
 }

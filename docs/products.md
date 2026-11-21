@@ -106,6 +106,4 @@ Mesuré en local : 2000 lignes analysées en 0,2 s, importées en 0,8 s.
 | `src/components/catalogue/` | Fiche produit et galerie du site (réutilisées par l'aperçu) |
 | `src/app/admin/(protected)/produits/` | Liste, filtres, tableau, fiche (création / modification), aperçu |
 
-## À venir
-
 Photos : voir `docs/images.md`.

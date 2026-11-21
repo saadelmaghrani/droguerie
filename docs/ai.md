@@ -1,5 +1,8 @@
 # Intelligence artificielle
 
+**En pause par défaut** : `AI_ENABLED=true` dans le `.env` (puis redémarrer) pour l'activer ; sinon le bouton
+n'apparaît pas et le reste du site fonctionne normalement (Paramètres › IA indique « IA en pause »).
+
 L'IA n'est proposée **qu'à l'ajout d'un produit** (`/admin/produits/nouveau`), via un seul bouton
 **« Générer avec l'IA »**. La fiche de modification n'a aucun assistant IA (seul le bouton
 « Revenir à la photo d'origine » reste, pour annuler un fond blanc).
@@ -69,6 +72,7 @@ faces jamais photographiées. Les montages et mises en scène gardent la face vi
 
 | Variable | Rôle |
 |---|---|
+| `AI_ENABLED` | `true` = bouton « Générer avec l'IA » visible (défaut : pause) |
 | `OPENAI_API_KEY` | Clé secrète. Vide = parties OpenAI désactivées. Jamais préfixée `NEXT_PUBLIC_` |
 | `OPENAI_MODEL` | Modèle texte + lecture de photo (défaut `gpt-6-luna`, le plus économique) |
 | `OPENAI_IMAGE_MODEL` | Modèle des mises en scène IA optionnelles (défaut `gpt-image-2.5-sunburst`) |

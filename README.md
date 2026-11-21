@@ -24,7 +24,7 @@ cp .env.example .env        # puis remplir les valeurs (mots de passe, compte ad
 npm run db:up               # démarre PostgreSQL (Docker)
 npx prisma migrate deploy   # crée les tables
 npm run db:seed             # paramètres, compte admin, données de démo si SEED_DEMO_DATA=true
-npm run ai:model            # modèle de détourage « fond studio » (≈ 170 Mo, une seule fois)
+npm run ai:model            # facultatif (IA) : modèle de détourage « fond blanc » (≈ 170 Mo, une seule fois)
 npm run dev                 # http://localhost:3000
 ```
 
@@ -43,7 +43,7 @@ Espace administrateur : http://localhost:3000/admin (identifiants : `ADMIN_EMAIL
 | `npm run db:migrate -- --name <nom>` | Nouvelle migration après modification du schéma |
 | `npm run db:seed` | Données initiales (relançable sans doublons) |
 | `npm run db:studio` | Explorer la base dans le navigateur |
-| `npm run ai:model` | Télécharge le modèle de détourage (fond studio), empreinte vérifiée |
+| `npm run ai:model` | Télécharge le modèle de détourage (IA, fond blanc), empreinte vérifiée |
 
 ## Dépannage
 

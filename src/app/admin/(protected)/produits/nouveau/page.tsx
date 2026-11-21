@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { isAiConfigured } from "@/server/ai/client";
+import { isAiConfigured, isAiFeatureEnabled } from "@/server/ai/client";
 import { requireAdmin } from "@/server/auth/dal";
 import { listCategoryOptions } from "@/server/products/service";
 import { PageHeader } from "../../_components/page-header";
@@ -12,7 +12,7 @@ export const metadata: Metadata = { title: "Nouveau produit" };
 async function NewProductContent() {
   await requireAdmin();
   const categories = await listCategoryOptions();
-  return <ProductForm product={null} categories={categories} aiConfigured={isAiConfigured()} />;
+  return <ProductForm product={null} categories={categories} aiEnabled={isAiFeatureEnabled()} aiConfigured={isAiConfigured()} />;
 }
 
 export default function NewProductPage() {

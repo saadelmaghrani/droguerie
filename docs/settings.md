@@ -32,6 +32,4 @@ Les formulaires admin à champs contrôlés (catégories, paramètres) sont envo
 Avec `action`, React 19 réinitialise le formulaire après l'envoi : les interrupteurs et listes Radix
 revenaient alors à leur valeur de départ (bug constaté et couvert par des tests de non-régression).
 
-## À venir
-
-Logo et image de bannière : avec l'envoi d'images (semaine 3).
+Logo et image de bannière : envoi d'images (voir `docs/images.md`).
