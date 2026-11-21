@@ -2,6 +2,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   /* config options here */
+  // Développement uniquement : autorise l'ouverture du site depuis un téléphone sur le même Wi-Fi
+  // (http://<adresse-du-Mac>:3000). Sans effet en production.
+  allowedDevOrigins: ["192.168.*.*", "10.*.*.*", "172.16.*.*", "*.local"],
   cacheComponents: true,
   partialPrefetching: true,
   reactCompiler: true,
