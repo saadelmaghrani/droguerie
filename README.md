@@ -36,10 +36,24 @@ Espace administrateur : http://localhost:3000/admin (identifiants : `ADMIN_EMAIL
 | `npm run dev` | Serveur de développement |
 | `npm run build` / `npm start` | Build et serveur de production |
 | `npm run lint` | Analyse du code (ESLint) |
+| `npm run clean` | Supprime le cache de compilation `.next` (voir Dépannage) |
 | `npm run db:up` / `db:down` | Démarrer / arrêter PostgreSQL |
 | `npm run db:migrate -- --name <nom>` | Nouvelle migration après modification du schéma |
 | `npm run db:seed` | Données initiales (relançable sans doublons) |
 | `npm run db:studio` | Explorer la base dans le navigateur |
+
+## Dépannage
+
+**La page se recharge en boucle en développement** (`npm run dev`) : le cache de compilation
+Turbopack (`.next/`) est dans un état incohérent. Arrêter le serveur avec `Ctrl + C`, puis :
+
+```bash
+npm run clean
+npm run dev
+```
+
+Ce dossier ne contient que des fichiers générés : le supprimer ne fait rien perdre.
+Arrêter toujours le serveur avec `Ctrl + C` plutôt que de fermer brutalement le Terminal.
 
 ## Documentation
 
