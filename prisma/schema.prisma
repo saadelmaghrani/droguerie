@@ -307,5 +307,6 @@ model AnalyticsEvent {
   @@index([type, createdAt])
   @@index([productId, type, createdAt])
   @@index([categoryId, type, createdAt])
+  @@index([visitorHash, createdAt]) // visite en cours d'un visiteur (sessions de 30 min)
   @@map("analytics_events")
 }

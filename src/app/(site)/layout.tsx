@@ -4,6 +4,7 @@
 import type { Metadata } from "next";
 import { connection } from "next/server";
 import { Suspense, type CSSProperties } from "react";
+import { AnalyticsTracker } from "@/components/site/analytics-tracker";
 import { SiteFooter } from "@/components/site/site-footer";
 import { SiteHeader } from "@/components/site/site-header";
 import { readableTextColor } from "@/lib/color";
@@ -35,6 +36,7 @@ async function SiteShell({ children }: { children: React.ReactNode }) {
       <SiteHeader settings={settings} categories={categories} />
       <main id="contenu" className="flex-1">{children}</main>
       <SiteFooter settings={settings} categories={categories} />
+      <AnalyticsTracker />
     </div>
   );
 }

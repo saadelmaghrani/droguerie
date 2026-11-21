@@ -5,6 +5,7 @@ import { ArrowRight, FileText, MessageCircle, Package, Tags, type LucideIcon } f
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { prisma } from "@/lib/prisma";
+import { getWeekSummary } from "@/server/analytics/stats";
 import { requireAdmin } from "@/server/auth/dal";
 import { PageHeader } from "./_components/page-header";
 
@@ -15,10 +16,11 @@ type Stat = { label: string; value: number; hint: string; href: string; icon: Lu
 async function DashboardContent() {
   const admin = await requireAdmin(); // vérification complète en base, AVANT toute lecture
 
-  const [statusCounts, categories, activeWhatsappNumbers] = await Promise.all([
+  const [statusCounts, categories, activeWhatsappNumbers, week] = await Promise.all([
     prisma.product.groupBy({ by: ["status"], _count: { _all: true } }),
     prisma.category.count(),
     prisma.whatsappNumber.count({ where: { isActive: true } }),
+    getWeekSummary(),
   ]);
   const countFor = (status: "PUBLISHED" | "DRAFT" | "HIDDEN") =>
     statusCounts.find((row) => row.status === status)?._count._all ?? 0;
@@ -62,9 +64,32 @@ async function DashboardContent() {
           </Link>
         ))}
       </div>
-      <p className="mt-6 text-xs text-muted-foreground">
-        Les statistiques de visite (visiteurs, consultations, clics WhatsApp) arriveront en semaine 5.
-      </p>
+      <section aria-labelledby="week" className="mt-8">
+        <div className="mb-3 flex items-end justify-between gap-3">
+          <h2 id="week" className="text-base font-semibold">Les 7 derniers jours</h2>
+          <Link href="/admin/statistiques?periode=7j" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground hover:underline">
+            Statistiques détaillées
+            <ArrowRight className="size-3.5" aria-hidden />
+          </Link>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-3">
+          {[
+            { label: "Visites", value: week.visits, change: week.changes.visits },
+            { label: "Consultations de produits", value: week.productViews, change: week.changes.productViews },
+            { label: "Clics WhatsApp", value: week.whatsappClicks, change: week.changes.whatsappClicks },
+          ].map(({ label, value, change }) => (
+            <Card key={label}>
+              <CardContent className="grid gap-1">
+                <span className="text-sm font-medium text-muted-foreground">{label}</span>
+                <span className="text-3xl font-semibold tabular-nums tracking-tight">{value.toLocaleString("fr-FR")}</span>
+                <span className="text-xs text-muted-foreground">
+                  {change == null ? "Pas de comparaison possible" : `${change > 0 ? "+" : ""}${change} % vs 7 jours précédents`}
+                </span>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </section>
     </>
   );
 }

@@ -7,7 +7,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { hashPassword, verifyPassword } from "@/lib/password";
-import { SESSION_COOKIE_NAME, sessionCookieOptions } from "./cookie";
+import { SESSION_COOKIE_NAME, sessionCookieOptions, STATS_IGNORE_COOKIE_NAME, statsIgnoreCookieOptions } from "./cookie";
 import { isLoginBlocked, LOCKOUT_MINUTES, recordLoginAttempt } from "./rate-limit";
 import { getRequestInfo } from "./request-info";
 import { createSession, deleteExpiredSessions, invalidateSession } from "./session";
@@ -81,6 +81,8 @@ export async function login(_previous: LoginState, formData: FormData): Promise<
   await prisma.adminUser.update({ where: { id: admin.id }, data: { lastLoginAt: new Date() } });
 
   cookieStore.set(SESSION_COOKIE_NAME, token, sessionCookieOptions(expiresAt));
+  // Cet appareil est celui du magasin : ses visites du site ne seront pas comptées dans les statistiques.
+  cookieStore.set(STATS_IGNORE_COOKIE_NAME, "1", statsIgnoreCookieOptions());
   redirect(safeRedirectTarget(formData.get("next")));
 }
 
