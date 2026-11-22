@@ -7,10 +7,11 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { ArrowRight } from "lucide-react";
 import { ProductDetail } from "@/components/catalogue/product-detail";
+import { PixelViewContent } from "@/components/site/meta-pixel";
 import { ProductGrid } from "@/components/site/product-card";
 import { mediaUrl } from "@/lib/media";
 import { absoluteUrl } from "@/lib/site-url";
-import { getPublicProduct, getRelatedProducts } from "@/server/catalogue/queries";
+import { getPublicProduct, getPublicSettings, getRelatedProducts } from "@/server/catalogue/queries";
 
 type Params = Promise<{ slug: string }>;
 
@@ -59,10 +60,11 @@ async function Related({ categoryId, excludeId, categorySlug, categoryName }: { 
 
 async function Content({ params }: { params: Params }) {
   await connection();
-  const product = await getPublicProduct((await params).slug);
+  const [product, settings] = await Promise.all([getPublicProduct((await params).slug), getPublicSettings()]);
   if (!product) notFound();
   return (
     <>
+      {settings.metaPixelId && <PixelViewContent id={product.id} name={product.name} category={product.category.name} />}
       <ProductDetail product={product} productUrl={absoluteUrl(`/produits/${product.slug}`)} />
       <Related categoryId={product.categoryId} excludeId={product.id} categorySlug={product.category.slug} categoryName={product.category.name} />
     </>

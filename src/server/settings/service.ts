@@ -26,12 +26,14 @@ export type StoreSettingsData = {
   seoDescription: string | null;
   showFeatured: boolean;
   showNewArrivals: boolean;
+  metaPixelId: string | null;
+  metaPixelEnabled: boolean;
 };
 
 /** Valeurs affichées dans le formulaire (chaînes vides au lieu de null). */
 export type StoreSettingsFormValues = {
-  [K in Exclude<keyof StoreSettingsData, "socialLinks" | "showFeatured" | "showNewArrivals">]: string;
-} & { facebook: string; instagram: string; tiktok: string; showFeatured: boolean; showNewArrivals: boolean };
+  [K in Exclude<keyof StoreSettingsData, "socialLinks" | "showFeatured" | "showNewArrivals" | "metaPixelEnabled">]: string;
+} & { facebook: string; instagram: string; tiktok: string; showFeatured: boolean; showNewArrivals: boolean; metaPixelEnabled: boolean };
 
 const SINGLETON_ID = 1;
 
@@ -60,6 +62,8 @@ export async function getStoreSettings(): Promise<StoreSettingsData & { updatedA
     seoDescription: row.seoDescription,
     showFeatured: row.showFeatured,
     showNewArrivals: row.showNewArrivals,
+    metaPixelId: row.metaPixelId,
+    metaPixelEnabled: row.metaPixelEnabled,
     updatedAt: row.updatedAt,
     logoKey: row.logoKey,
     heroImageKey: row.heroImageKey,
@@ -87,6 +91,8 @@ export function toFormValues(s: StoreSettingsData): StoreSettingsFormValues {
     seoDescription: text(s.seoDescription),
     showFeatured: s.showFeatured,
     showNewArrivals: s.showNewArrivals,
+    metaPixelId: text(s.metaPixelId),
+    metaPixelEnabled: s.metaPixelEnabled,
   };
 }
 

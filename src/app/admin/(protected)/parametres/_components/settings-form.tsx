@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { isHexColor, readableTextColor } from "@/lib/color";
 import { parseMapsEmbed } from "@/lib/external-links";
+import { parsePixelId } from "@/lib/meta-pixel";
 import { submitWithoutReset } from "@/lib/forms";
 import { formatPhone, normalizePhone } from "@/lib/phone";
 import { saveStoreSettings, type SettingsFormState } from "@/server/settings/actions";
@@ -18,7 +19,7 @@ import type { StoreSettingsFormValues } from "@/server/settings/service";
 import { StoreImageField } from "./store-image-field";
 
 type Values = StoreSettingsFormValues;
-type TextField = Exclude<keyof Values, "showFeatured" | "showNewArrivals">;
+type TextField = Exclude<keyof Values, "showFeatured" | "showNewArrivals" | "metaPixelEnabled">;
 
 const PLACEHOLDER_MARK = "[À REMPLACER]";
 const FIELD_LABELS: Partial<Record<TextField, string>> = {
@@ -127,6 +128,8 @@ export function SettingsForm({
   const colorOk = isHexColor(values.primaryColor);
   const phonePreview = values.phone.trim() ? normalizePhone(values.phone) : null;
   const mapsPreview = values.mapsEmbedUrl.trim() ? parseMapsEmbed(values.mapsEmbedUrl) : null;
+  const pixelPreview = parsePixelId(values.metaPixelId);
+  const pixelActive = values.metaPixelEnabled && pixelPreview.ok && pixelPreview.value !== null;
 
   return (
     // onSubmit (et non action) : évite la réinitialisation automatique qui remettait les
@@ -134,6 +137,7 @@ export function SettingsForm({
     <form onSubmit={submitWithoutReset(formAction)} className="grid gap-6 pb-24" noValidate>
       <input type="hidden" name="showFeatured" value={values.showFeatured ? "on" : ""} />
       <input type="hidden" name="showNewArrivals" value={values.showNewArrivals ? "on" : ""} />
+      <input type="hidden" name="metaPixelEnabled" value={values.metaPixelEnabled ? "on" : ""} />
 
       {placeholders.length > 0 && (
         <div role="status" className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
@@ -286,6 +290,42 @@ export function SettingsForm({
             {values.seoDescription || "Ajoutez une description pour donner envie de cliquer."}
           </p>
         </div>
+      </Section>
+
+      <Section
+        title="Publicité Meta (Facebook / Instagram)"
+        description="Le Pixel Meta mesure les visites venant de vos publicités. Il n'est chargé que sur le site public, jamais dans l'administration."
+      >
+        <div className="flex items-start justify-between gap-4 rounded-lg border p-3">
+          <div className="grid gap-1">
+            <Label htmlFor="s-metaPixelEnabled">Activer le Pixel Meta</Label>
+            <p className="text-xs text-muted-foreground">
+              Événements envoyés : pages vues, fiches produit consultées (ViewContent) et clics WhatsApp (Contact).
+            </p>
+          </div>
+          <Switch id="s-metaPixelEnabled" checked={values.metaPixelEnabled} onCheckedChange={(c) => set("metaPixelEnabled", c)} disabled={pending} />
+        </div>
+        <Field
+          id="s-metaPixelId"
+          label="Identifiant du Pixel (Meta Pixel ID)"
+          error={!pixelPreview.ok ? pixelPreview.error : errorOf("metaPixelId")}
+          hint={
+            <>
+              Meta Business Suite → <strong>Gestionnaire d&apos;événements</strong> → votre source de données → <strong>Paramètres</strong> →
+              copiez l&apos;« ID » (une suite de chiffres). Laissez vide pour ne rien charger.
+            </>
+          }
+        >
+          <Input {...inputProps("metaPixelId")} inputMode="numeric" autoComplete="off" spellCheck={false} placeholder="123456789012345" className="font-mono" />
+        </Field>
+        <p role="status" className={`flex items-center gap-1.5 text-sm ${pixelActive ? "text-emerald-700" : "text-muted-foreground"}`}>
+          {pixelActive ? <CircleCheck className="size-4" aria-hidden /> : <TriangleAlert className="size-4" aria-hidden />}
+          {pixelActive
+            ? "Le Pixel sera actif sur le site public après l'enregistrement."
+            : values.metaPixelEnabled
+              ? "Activé, mais il manque un identifiant valide : rien ne sera chargé."
+              : "Désactivé : aucun script Meta n'est chargé sur le site."}
+        </p>
       </Section>
 
       <Section title="Page d'accueil" description="Sections affichées sous la bannière.">

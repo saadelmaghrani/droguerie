@@ -33,3 +33,5 @@ Avec `action`, React 19 réinitialise le formulaire après l'envoi : les interru
 revenaient alors à leur valeur de départ (bug constaté et couvert par des tests de non-régression).
 
 Logo et image de bannière : envoi d'images (voir `docs/images.md`).
+
+- **Meta Pixel** : voir [site.md](site.md#meta-facebook-pixel).

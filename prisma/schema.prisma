@@ -148,6 +148,10 @@ model StoreSettings {
   showFeatured    Boolean @default(true) @map("show_featured")
   showNewArrivals Boolean @default(true) @map("show_new_arrivals")
 
+  // Meta (Facebook) Pixel : chargé sur le site public seulement si activé ET identifiant valide.
+  metaPixelId      String? @map("meta_pixel_id") // chiffres uniquement
+  metaPixelEnabled Boolean @default(false) @map("meta_pixel_enabled")
+
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("store_settings")

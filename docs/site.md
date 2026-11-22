@@ -63,3 +63,17 @@ petite image. Chargement différé hors écran.
 Image par défaut (`src/components/catalogue/product-placeholder.tsx`) : pictogramme de la catégorie sur un
 fond teinté de la couleur du site, libellé « Photo à venir ». Concerne uniquement les produits publiés
 avant la règle « photo obligatoire » (voir `docs/products.md`).
+
+## Meta (Facebook) Pixel
+
+Configuré dans **Admin → Paramètres → Publicité Meta** : interrupteur + identifiant (chiffres, copié depuis le
+Gestionnaire d'événements Meta). Colonnes `meta_pixel_enabled` / `meta_pixel_id` de `store_settings`.
+
+- Chargé **uniquement** sur le site public (`app/(site)/layout.tsx`), jamais dans `/admin`, et seulement si
+  activé **et** valide (`activePixelId`, `src/lib/meta-pixel.ts`). Sinon : aucun script, aucune erreur.
+- Événements (`src/components/site/meta-pixel.tsx`) : `PageView` (arrivée + chaque navigation interne),
+  `ViewContent` (fiche produit : `content_ids`, `content_name`, `content_category`), `Contact`
+  (`method: "whatsapp"`) au clic sur un lien `wa.me`.
+- Collecte automatique de Meta désactivée (`autoConfig` à false), « Ne pas me suivre » (DNT/GPC) respecté.
+- ⚠️ Contrairement à nos statistiques, le Pixel dépose des cookies Meta (`_fbp`) et envoie des données à Meta :
+  vérifier les obligations (loi 09-08 / CNDP) et prévoir une mention dans la politique de confidentialité.

@@ -9,6 +9,7 @@ import { cacheLife, cacheTag } from "next/cache";
 import { Prisma } from "@/generated/prisma/client";
 import { categoryIconKey, type CategoryIconKey } from "@/lib/category-icons";
 import { DEFAULT_PRIMARY_COLOR } from "@/lib/color";
+import { activePixelId } from "@/lib/meta-pixel";
 import { prisma } from "@/lib/prisma";
 import { pickWhatsappPhone } from "@/lib/product-visibility";
 import type { ProductDetailData } from "@/server/products/preview";
@@ -45,6 +46,8 @@ export type PublicSettings = {
   showNewArrivals: boolean;
   /** Numéro WhatsApp par défaut (contact général), ou null. */
   defaultWhatsapp: string | null;
+  /** Meta Pixel à charger (activé ET valide), sinon null. */
+  metaPixelId: string | null;
 };
 
 export async function getPublicSettings(): Promise<PublicSettings> {
@@ -75,6 +78,7 @@ export async function getPublicSettings(): Promise<PublicSettings> {
     showFeatured: row?.showFeatured ?? true,
     showNewArrivals: row?.showNewArrivals ?? true,
     defaultWhatsapp: whatsapp?.phone ?? null,
+    metaPixelId: activePixelId(row?.metaPixelEnabled, row?.metaPixelId),
   };
 }
 

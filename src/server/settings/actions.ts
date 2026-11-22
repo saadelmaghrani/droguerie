@@ -5,6 +5,7 @@ import { refresh } from "next/cache";
 import { invalidateCatalogue } from "@/server/catalogue/cache";
 import { z } from "zod";
 import { isHexColor } from "@/lib/color";
+import { parsePixelId } from "@/lib/meta-pixel";
 import { parseMapsEmbed, parseSocialUrl, type SocialNetwork } from "@/lib/external-links";
 import { normalizePhone } from "@/lib/phone";
 import { requireAdmin } from "@/server/auth/dal";
@@ -64,6 +65,11 @@ export async function saveStoreSettings(_previous: SettingsFormState, formData: 
   const maps = mapsInput ? parseMapsEmbed(mapsInput) : null;
   if (maps && !maps.ok) fieldErrors.mapsEmbedUrl ??= maps.error;
 
+  const pixel = parsePixelId(read("metaPixelId"));
+  if (!pixel.ok) fieldErrors.metaPixelId ??= pixel.error;
+  const pixelEnabled = formData.get("metaPixelEnabled") === "on";
+  if (pixel.ok && pixelEnabled && !pixel.value) fieldErrors.metaPixelId ??= "Renseignez l'identifiant du Pixel, ou désactivez-le.";
+
   const socialLinks: Partial<Record<SocialNetwork, string>> = {};
   for (const network of ["facebook", "instagram", "tiktok"] as const) {
     const input = read(network).trim();
@@ -95,6 +101,8 @@ export async function saveStoreSettings(_previous: SettingsFormState, formData: 
     seoDescription: d.seoDescription,
     showFeatured: formData.get("showFeatured") === "on",
     showNewArrivals: formData.get("showNewArrivals") === "on",
+    metaPixelId: pixel.ok ? pixel.value : null,
+    metaPixelEnabled: pixelEnabled,
   });
   refresh();
   invalidateCatalogue();
