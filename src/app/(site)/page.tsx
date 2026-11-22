@@ -4,8 +4,8 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { ArrowRight, Clock, MapPin } from "lucide-react";
+import { CategoryTiles } from "@/components/site/category-tiles";
 import { ProductGrid } from "@/components/site/product-card";
-import { CategoryIcon } from "@/lib/category-icons";
 import { SearchBox } from "@/components/site/search-box";
 import { WhatsappIcon } from "@/components/site/whatsapp-icon";
 import { mediaSrcSet, mediaUrl } from "@/lib/media";
@@ -15,7 +15,6 @@ import {
   getNewArrivals,
   getPublicCategories,
   getPublicSettings,
-  type PublicCategory,
 } from "@/server/catalogue/queries";
 
 function SectionTitle({ title, href, linkLabel }: { title: string; href?: string; linkLabel?: string }) {
@@ -29,37 +28,6 @@ function SectionTitle({ title, href, linkLabel }: { title: string; href?: string
         </Link>
       )}
     </div>
-  );
-}
-
-function CategoryTiles({ categories }: { categories: PublicCategory[] }) {
-  return (
-    <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-      {categories.map((c) => (
-        <li key={c.id}>
-          <Link
-            href={`/categories/${c.slug}`}
-            className="group flex items-center gap-3 rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-200 transition hover:bg-white hover:shadow-md focus-visible:outline-2 focus-visible:outline-[var(--brand)] sm:flex-col sm:items-stretch"
-          >
-            <div className="relative size-14 shrink-0 overflow-hidden rounded-xl bg-white sm:aspect-[4/3] sm:size-auto">
-              {c.coverKey ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={mediaUrl(c.coverKey, 320)} alt="" loading="lazy" className="absolute inset-0 size-full object-contain p-1" />
-              ) : (
-                <CategoryIcon icon={c.icon} className="absolute inset-0 m-auto size-7 text-[var(--brand)]" />
-              )}
-            </div>
-            <span className="grid min-w-0">
-              <span className="flex min-w-0 items-center gap-1.5 font-medium text-slate-900">
-                <CategoryIcon icon={c.icon} className="size-4 shrink-0 text-[var(--brand)]" />
-                <span className="truncate">{c.name}</span>
-              </span>
-              <span className="text-xs text-slate-500">{c.productCount} produit{c.productCount > 1 ? "s" : ""}</span>
-            </span>
-          </Link>
-        </li>
-      ))}
-    </ul>
   );
 }
 
