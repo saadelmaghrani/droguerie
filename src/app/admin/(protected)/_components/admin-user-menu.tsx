@@ -1,9 +1,7 @@
 // Bloc « utilisateur connecté » en bas du menu : initiales, nom, email, déconnexion.
-import { LogOut } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getCurrentAdmin } from "@/server/auth/dal";
-import { logout } from "@/server/auth/actions";
+import { LogoutButton } from "./logout-button";
 
 function initials(name: string): string {
   return name
@@ -30,11 +28,7 @@ export async function AdminUserMenu() {
         <p className="truncate text-sm font-medium text-sidebar-foreground">{admin.name}</p>
         <p className="truncate text-xs text-muted-foreground">{admin.email}</p>
       </div>
-      <form action={logout}>
-        <Button type="submit" variant="ghost" size="icon" aria-label="Se déconnecter" title="Se déconnecter">
-          <LogOut className="size-4" aria-hidden />
-        </Button>
-      </form>
+      <LogoutButton />
     </div>
   );
 }
