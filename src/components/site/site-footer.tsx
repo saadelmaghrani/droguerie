@@ -1,14 +1,20 @@
 // Pied de page : coordonnées, horaires, réseaux sociaux, contact WhatsApp.
 // Un champ vide dans les Paramètres = information masquée.
 import Link from "next/link";
-import { Clock, Mail, MapPin, Phone } from "lucide-react";
+import { ArrowRight, Clock, Mail, MapPin, Phone } from "lucide-react";
 import { formatPhone, whatsappUrl } from "@/lib/phone";
 import type { PublicCategory, PublicSettings } from "@/server/catalogue/queries";
 import { WhatsappIcon } from "./whatsapp-icon";
 
+/** Catégories listées dans le pied de page ; au-delà, un lien « Toutes les catégories » vers le catalogue. */
+const FOOTER_CATEGORY_LIMIT = 5;
+
 const SOCIAL_LABELS = { facebook: "Facebook", instagram: "Instagram", tiktok: "TikTok" } as const;
 
 export function SiteFooter({ settings, categories }: { settings: PublicSettings; categories: PublicCategory[] }) {
+  // Peu de catégories (6 ou moins) : toutes affichées, pas de lien « voir tout » qui ne cacherait qu'une ligne.
+  const footerCategories = categories.length > FOOTER_CATEGORY_LIMIT + 1 ? categories.slice(0, FOOTER_CATEGORY_LIMIT) : categories;
+  const moreCount = categories.length - footerCategories.length;
   const socials = (Object.keys(SOCIAL_LABELS) as (keyof typeof SOCIAL_LABELS)[]).filter((k) => settings.socialLinks[k]);
   return (
     <footer className="mt-16 border-t border-slate-200 bg-slate-50">
@@ -40,11 +46,23 @@ export function SiteFooter({ settings, categories }: { settings: PublicSettings;
         {categories.length > 0 && (
           <section className="grid content-start gap-3">
             <h2 className="text-base font-semibold text-slate-900">Catégories</h2>
-            <ul className="grid gap-1.5 text-sm">
-              {categories.map((c) => (
-                <li key={c.id}><Link href={`/categories/${c.slug}`} className="text-slate-600 hover:text-slate-900 hover:underline">{c.name}</Link></li>
+            {/* Mobile : 2 colonnes (footer moins haut) ; dès 640 px : 1 colonne dans sa propre colonne. */}
+            <ul className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-1 sm:gap-y-1.5">
+              {footerCategories.map((c) => (
+                <li key={c.id} className="min-w-0">
+                  <Link href={`/categories/${c.slug}`} className="block truncate text-slate-600 hover:text-slate-900 hover:underline">{c.name}</Link>
+                </li>
               ))}
             </ul>
+            {moreCount > 0 && (
+              <Link
+                href="/produits"
+                className="inline-flex w-fit items-center gap-1 text-sm font-medium text-slate-900 underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand)]"
+              >
+                Toutes les catégories ({categories.length})
+                <ArrowRight className="size-3.5" aria-hidden />
+              </Link>
+            )}
           </section>
         )}
 
