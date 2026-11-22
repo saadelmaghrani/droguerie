@@ -75,9 +75,10 @@ export async function processImage(file: File, preset: ImagePreset, subfolder?: 
       ...(keepOriginal ? [{ suffix: "orig", width: 2400, quality: 90 }] : []),
     ];
     for (const target of targets) {
-      const data = await base
-        .clone()
-        .autoOrient()
+      const oriented = base.clone().autoOrient();
+      // Logo : marges unies retirées (sinon il paraît minuscule dans l'en-tête).
+      if (preset === "logo") oriented.trim({ threshold: 20 });
+      const data = await oriented
         .resize({ width: target.width, height: target.width, fit: "inside", withoutEnlargement: true })
         .webp({ quality: target.quality, effort: 4 })
         .toBuffer();
