@@ -6,6 +6,7 @@
 // Détourage impossible (modèle absent, aucun produit net) : la photo d'origine est gardée telle quelle.
 import "server-only";
 
+import sharp from "sharp";
 import { isMultiPack } from "@/lib/multi-pack";
 import { AiError } from "@/server/ai/errors";
 import { studioFromCutout } from "@/server/ai/studio-cutout";
@@ -45,6 +46,28 @@ export async function processProductPhoto(file: File, subfolder: string, product
     const reason = error instanceof AiError && error.kind in NOTICES ? NOTICES[error.kind as keyof typeof NOTICES] : "traitement impossible";
     if (!(error instanceof AiError)) console.error("[photo studio] détourage impossible :", error);
     return { ok: true, photo: { ...original.image, source: "ORIGINAL", originalStorageKey: null }, notice: `Photo gardée telle quelle : ${reason}.` };
+  }
+}
+
+/**
+ * APERÇU (page « Nouveau produit ») : même traitement que processProductPhoto, mais rien n'est enregistré.
+ * Renvoie une image WebP 800 px (data URL) à afficher, ou null + la raison si la photo sera gardée telle quelle.
+ */
+export async function previewProductPhoto(file: File, productName = ""): Promise<{ ok: true; dataUrl: string | null; notice?: string } | { ok: false; error: string }> {
+  let input: Buffer;
+  try {
+    input = Buffer.from(await file.arrayBuffer());
+    await sharp(input, { limitInputPixels: false }).metadata(); // fichier image lisible ?
+  } catch {
+    return { ok: false, error: "Impossible de lire cette image. Essayez avec une autre photo." };
+  }
+  try {
+    const png = await studioFromCutout(input, { singleItem: !isMultiPack(productName) });
+    const webp = await sharp(png).resize(800, 800, { fit: "inside", withoutEnlargement: true }).webp({ quality: 80 }).toBuffer();
+    return { ok: true, dataUrl: `data:image/webp;base64,${webp.toString("base64")}` };
+  } catch (error) {
+    const reason = error instanceof AiError && error.kind in NOTICES ? NOTICES[error.kind as keyof typeof NOTICES] : "traitement impossible";
+    return { ok: true, dataUrl: null, notice: `Photo gardée telle quelle : ${reason}.` };
   }
 }
 

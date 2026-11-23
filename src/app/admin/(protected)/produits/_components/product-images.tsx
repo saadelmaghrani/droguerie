@@ -80,11 +80,11 @@ export function ProductImages({
 
   return (
     <div className="grid gap-3">
-      <ul className="grid gap-3 sm:grid-cols-3" aria-label="Photos du produit">
+      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3" aria-label="Photos du produit">
         {SLOTS.map((position) => {
           const image = byPosition.get(position);
           return (
-            <li key={position} className="grid gap-2">
+            <li key={position} className="grid min-w-0 content-start gap-2">
               <span className="text-xs font-medium text-muted-foreground">
                 {position === 0 ? "Photo principale" : `Photo ${position + 1}`}
               </span>
@@ -180,8 +180,8 @@ function FilledSlot({
   const position = image.position + 1;
 
   return (
-    <div className="grid gap-2">
-      <div className="relative aspect-square overflow-hidden rounded-lg border bg-muted/30">
+    <div className="grid min-w-0 gap-2">
+      <div className="relative aspect-square overflow-hidden rounded-lg border bg-white">
         <Image
           src={mediaUrl(image.storageKey, 800)}
           alt={`${productName} — photo ${position}`}
@@ -235,7 +235,7 @@ function FilledSlot({
         </Button>
       </div>
       {image.originalStorageKey && (
-        <Button type="button" variant="ghost" size="sm" disabled={disabled} onClick={onRestore} className="justify-start">
+        <Button type="button" variant="ghost" size="sm" disabled={disabled} onClick={onRestore} className="h-auto justify-start py-1.5 text-left whitespace-normal">
           <Undo2 aria-hidden />
           Revenir à la photo d&apos;origine
         </Button>

@@ -8,7 +8,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/server/auth/dal";
 import { readUploadedFile } from "@/server/media/images";
-import { processProductPhoto } from "./studio-photo";
+import { previewProductPhoto, processProductPhoto } from "./studio-photo";
 import {
   addProductImage,
   countProductImages,
@@ -72,6 +72,15 @@ function withStudioMessage(result: ImageServiceResult, processed: Extract<Awaite
   if (!result.ok) return result;
   if (processed.notice) return { ok: true, message: `${result.message} ${processed.notice}` };
   return { ok: true, message: `${result.message.replace(/\.$/, "")}, détourée sur fond blanc.` };
+}
+
+/** Aperçu « fond blanc » d'une photo choisie sur « Nouveau produit » (rien n'est enregistré). */
+export async function previewStudioPhoto(formData: FormData) {
+  await requireAdmin();
+  if (!(formData instanceof FormData)) return { ok: false as const, error: "Requête invalide." };
+  const upload = readUploadedFile(formData.get("file"));
+  if (!upload.ok) return { ok: false as const, error: upload.error };
+  return previewProductPhoto(upload.file, String(formData.get("name") ?? "").slice(0, 200));
 }
 
 async function run(imageId: unknown, operation: (id: string) => Promise<ImageServiceResult>): Promise<ImageServiceResult> {

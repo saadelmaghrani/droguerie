@@ -301,7 +301,7 @@ export function ProductForm({
                 draft ? (
                   <DraftPhotos draft={draft} choice={draftChoice} onChange={setDraftChoice} disabled={pending || uploadProgress !== null} />
                 ) : (
-                  <PendingImages images={pendingImages} onChange={setPendingImages} disabled={pending || uploadProgress !== null || generating} />
+                  <PendingImages images={pendingImages} onChange={setPendingImages} disabled={pending || uploadProgress !== null || generating} productName={values.name} />
                 )
               )}
             </CardContent>
