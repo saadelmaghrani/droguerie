@@ -89,6 +89,33 @@ Modèle de détourage : `npm run ai:model` une fois par machine **et sur le serv
 (≈ 170 Mo, ISNet, licence Apache-2.0, MD5 vérifié), exécuté par `onnxruntime-node` (MIT).
 `@imgly/background-removal-node` écarté : licence AGPL.
 
+## Clé API : provenance, contrôle et rechargement
+
+**D'où vient la clé ?** Next.js cherche `OPENAI_API_KEY` dans cet ordre et garde la PREMIÈRE trouvée :
+1. variable du système (exportée dans le terminal, Docker, hébergeur) ;
+2. `.env.development.local` / `.env.production.local` ;
+3. `.env.local` ;
+4. `.env.development` / `.env.production` ;
+5. `.env`.
+
+Règle du projet : **la clé est uniquement dans `.env`** (aucun `.env.local`, aucun `export` dans `~/.zshrc`).
+
+**Contrôles mis en place** (`src/server/ai/key-check.ts`, testé ; `key-status.ts`) :
+- au démarrage du serveur (`src/instrumentation.ts`, si `AI_ENABLED=true`), une ligne `[IA] Clé OpenAI : …`
+  dans le journal : format, fichier de provenance, conflit éventuel ;
+- avant chaque appel : une clé mal formatée n'est PAS envoyée à OpenAI (erreur `malformed_key`) ;
+- Paramètres › Intelligence artificielle : format, indice `sk-…abcd` (4 derniers caractères, comme sur le
+  tableau de bord OpenAI), provenance, alerte si un autre fichier contient une autre valeur, alerte si une
+  variable `NEXT_PUBLIC_*` contient une clé, procédure de changement, « Tester la connexion » (avec la clé testée) ;
+- les échecs liés à la clé enregistrent son indice : si la clé a été changée depuis, l'alerte le dit au lieu
+  d'afficher une erreur périmée.
+
+**Recharger après modification du `.env` :**
+- en local (`npm run dev`) : rechargé automatiquement à l'enregistrement (Next.js surveille les fichiers `.env*`) ;
+  le client OpenAI est recréé dès que la clé change (aucune ancienne clé en cache) ;
+- en production (`npm start` / Docker) : le `.env` n'est lu qu'au démarrage → redémarrer le site.
+  Le `.env` du serveur est distinct de celui de l'ordinateur de développement.
+
 ## Sécurité
 
 - Clé lue uniquement par `src/server/ai/client.ts` (`import "server-only"`). Vérifié par test : absente
@@ -101,7 +128,9 @@ Modèle de détourage : `npm run ai:model` une fois par machine **et sur le serv
 | Cas | Code OpenAI | Message à l'admin |
 |---|---|---|
 | Clé absente | — | « L'IA n'est pas configurée… » |
-| Clé fausse / révoquée | 401 | « Clé API OpenAI refusée… créez une nouvelle clé » |
+| Clé mal formatée (guillemet, espace, exemple, coupée, sans `sk-`) | — (rien n'est envoyé) | « La clé OPENAI_API_KEY du .env est mal formatée… » + détail précis dans Paramètres |
+| Clé fausse / supprimée / révoquée | 401 | « Clé API OpenAI refusée par OpenAI… créez une nouvelle clé » |
+| Clé expirée | 401 `expired_secret_key` | « Clé API OpenAI expirée. Créez une nouvelle clé… » |
 | Crédit épuisé | 429 `insufficient_quota`, `credit_balance_exhausted` | « Crédit OpenAI épuisé : rechargez le compte… » |
 | Plafond atteint | 429 `*_spend_limit_exceeded`, `*_usage_limit_exceeded` | « Plafond de dépenses atteint… » |
 | Trop de demandes | 429 autres | « Patientez une minute » |
@@ -117,6 +146,7 @@ Modèle de détourage : `npm run ai:model` une fois par machine **et sur le serv
 | Fichier | Rôle |
 |---|---|
 | `src/server/ai/client.ts` | Clé, modèle, client OpenAI (serveur uniquement) |
+| `src/server/ai/key-check.ts`, `key-status.ts`, `src/instrumentation.ts` | Contrôle de la clé : format, provenance, conflits, journal de démarrage (testé) |
 | `src/server/ai/errors.ts` | Erreurs → messages en français (testé) |
 | `src/server/ai/draft-service.ts` | Brouillon : génération parallèle, rattachement des choix, nettoyage |
 | `src/server/ai/studio-cutout.ts` | Détourage, fond blanc, montages studio / table (testé : pixels identiques, photo vide refusée) |

@@ -5,7 +5,9 @@ import { APIConnectionError, APIError } from "openai";
 
 export type AiErrorKind =
   | "not_configured" // clé absente du .env
-  | "invalid_key" // 401 : clé fausse, expirée ou révoquée
+  | "malformed_key" // clé présente mais mal formatée (guillemets, espaces…) : jamais envoyée à OpenAI
+  | "invalid_key" // 401 : clé fausse, supprimée ou révoquée
+  | "expired_key" // 401 « expired_secret_key » : clé expirée
   | "forbidden" // 403 : pays non pris en charge, droits de la clé
   | "billing" // 429 : crédit épuisé → recharger le compte
   | "spend_limit" // 429 : plafond de dépenses atteint → relever la limite
@@ -24,7 +26,10 @@ const LIMITS_URL = "https://platform.openai.com/settings/organization/limits";
 
 export const AI_MESSAGES: Record<AiErrorKind, string> = {
   not_configured: "L'IA n'est pas configurée : ajoutez la clé OPENAI_API_KEY dans le fichier .env du serveur, puis redémarrez le site.",
-  invalid_key: `Clé API OpenAI refusée (fausse, expirée ou supprimée). Créez une nouvelle clé sur ${KEYS_URL} et remplacez OPENAI_API_KEY dans le .env.`,
+  malformed_key:
+    "La clé OPENAI_API_KEY du .env est mal formatée (guillemets, espaces, texte d'exemple ou clé coupée) : elle n'a pas été envoyée à OpenAI. Le détail est dans Paramètres › Intelligence artificielle.",
+  invalid_key: `Clé API OpenAI refusée par OpenAI (fausse, supprimée ou révoquée). Créez une nouvelle clé sur ${KEYS_URL}, remplacez OPENAI_API_KEY dans le .env du serveur, puis redémarrez le site.`,
+  expired_key: `Clé API OpenAI expirée. Créez une nouvelle clé sur ${KEYS_URL}, remplacez OPENAI_API_KEY dans le .env du serveur, puis redémarrez le site.`,
   forbidden: "OpenAI refuse l'accès (pays non pris en charge ou droits insuffisants de la clé). Vérifiez les permissions de la clé sur platform.openai.com.",
   billing: `Crédit OpenAI épuisé : rechargez le compte sur ${BILLING_URL}. L'IA refonctionnera quelques minutes après le paiement.`,
   spend_limit: `Plafond de dépenses OpenAI atteint : augmentez la limite sur ${LIMITS_URL}, ou attendez le mois prochain.`,
@@ -39,7 +44,10 @@ export const AI_MESSAGES: Record<AiErrorKind, string> = {
 };
 
 /** L'administrateur doit agir sur son compte OpenAI (bandeau d'alerte, pas une simple erreur passagère). */
-export const ACCOUNT_ACTION_KINDS: AiErrorKind[] = ["not_configured", "invalid_key", "forbidden", "billing", "spend_limit", "model", "budget"];
+/** Erreurs liées à la clé elle-même (à corriger dans le .env). */
+export const KEY_ERROR_KINDS: AiErrorKind[] = ["not_configured", "malformed_key", "invalid_key", "expired_key"];
+
+export const ACCOUNT_ACTION_KINDS: AiErrorKind[] = ["not_configured", "malformed_key", "invalid_key", "expired_key", "forbidden", "billing", "spend_limit", "model", "budget"];
 
 export class AiError extends Error {
   constructor(
@@ -56,7 +64,7 @@ type ErrorLike = { status?: number; code?: string | null; type?: string; message
 
 function kindFromApiError({ status, code, type }: ErrorLike): AiErrorKind {
   const c = code ?? "";
-  if (status === 401) return "invalid_key";
+  if (status === 401) return c.includes("expired") ? "expired_key" : "invalid_key";
   if (status === 403) return "forbidden";
   if (status === 404 || c === "model_not_found") return "model";
   if (status === 429) {

@@ -9,6 +9,8 @@ const apiError = (status: number, code?: string, type?: string) =>
 describe("classification des erreurs OpenAI", () => {
   it.each([
     [401, undefined, undefined, "invalid_key"],
+    [401, "invalid_api_key", "invalid_request_error", "invalid_key"],
+    [401, "expired_secret_key", undefined, "expired_key"],
     [403, undefined, undefined, "forbidden"],
     [429, "insufficient_quota", "insufficient_quota", "billing"],
     [429, "credit_balance_exhausted", undefined, "billing"],

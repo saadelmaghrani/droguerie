@@ -5,6 +5,7 @@ import "server-only";
 
 import OpenAI from "openai";
 import { AiError } from "./errors";
+import { inspectApiKey, keyHint } from "./key-check";
 
 /** Modèle par défaut : le plus économique, lit les photos (≈ 0,001 $ par fiche). Modifiable via OPENAI_MODEL. */
 export const DEFAULT_OPENAI_MODEL = "gpt-6-luna";
@@ -31,13 +32,24 @@ export function isAiConfigured(): boolean {
   return Boolean(process.env.OPENAI_API_KEY?.trim());
 }
 
+/** « sk-…abcd » de la clé lue en ce moment (null si absente) : pour savoir QUELLE clé a échoué. */
+export function currentKeyHint(): string | null {
+  const key = process.env.OPENAI_API_KEY?.trim();
+  return key ? keyHint(key) : null;
+}
+
 let client: OpenAI | null = null;
 let clientKey: string | null = null;
 
-/** Client OpenAI ; lève AiError("not_configured") si la clé est absente. */
+/**
+ * Client OpenAI. Lève AiError("not_configured") si la clé est absente, AiError("malformed_key") si elle
+ * est visiblement mal recopiée (rien n'est alors envoyé à OpenAI). La clé est relue à chaque appel :
+ * si elle change (rechargement du .env), un nouveau client est créé — aucune ancienne clé en cache.
+ */
 export function openai(): OpenAI {
-  const apiKey = process.env.OPENAI_API_KEY?.trim();
-  if (!apiKey) throw new AiError("not_configured");
+  const check = inspectApiKey(process.env.OPENAI_API_KEY);
+  if (!check.ok) throw new AiError(check.issue === "missing" ? "not_configured" : "malformed_key", check.issue);
+  const apiKey = process.env.OPENAI_API_KEY!.trim();
   if (!client || clientKey !== apiKey) {
     client = new OpenAI({
       apiKey,

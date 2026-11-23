@@ -19,7 +19,8 @@ import { localStorage } from "@/server/media/storage";
 import type { AiGenerationType } from "@/generated/prisma/client";
 import { isMultiPack } from "@/lib/multi-pack";
 import { DEFAULT_SCENE_BACKGROUND, type ExtraCount, type ExtraKind, type SceneBackground } from "@/lib/ai-costs";
-import { ACCOUNT_ACTION_KINDS, AiError, classifyOpenAiError } from "./errors";
+import { currentKeyHint } from "./client";
+import { ACCOUNT_ACTION_KINDS, AiError, classifyOpenAiError, KEY_ERROR_KINDS } from "./errors";
 import { generateProductText } from "./product-text";
 import { estimateCostUsd, type ProductTextHints } from "./product-text-prompt";
 import { budgetError, ESTIMATED_COST_USD } from "./budget";
@@ -107,7 +108,8 @@ async function runPart<T>(
           provider,
           model: fallbackModel,
           durationMs: Date.now() - started,
-          errorMessage: `${aiError.kind}: ${aiError.detail ?? ""}`.slice(0, 500),
+          // « [clé sk-…abcd] » : permet de savoir plus tard si l'erreur concernait la clé ACTUELLE (jamais la clé entière).
+          errorMessage: `${aiError.kind}: ${KEY_ERROR_KINDS.includes(aiError.kind) ? `[clé ${currentKeyHint() ?? "absente"}] ` : ""}${aiError.detail ?? ""}`.slice(0, 500),
         },
       });
     }

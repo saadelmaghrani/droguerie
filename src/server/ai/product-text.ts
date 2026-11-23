@@ -4,7 +4,7 @@
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
-import { aiModel, openai } from "./client";
+import { aiModel, currentKeyHint, openai } from "./client";
 import { ACCOUNT_ACTION_KINDS, AiError, classifyOpenAiError } from "./errors";
 import {
   buildProductTextPrompt,
@@ -45,15 +45,18 @@ export async function generateProductText(
 }
 
 /** Appel minimal pour vérifier la clé ET le crédit (une requête de quelques jetons, coût négligeable). */
-export async function testAiConnection(): Promise<{ ok: true; model: string } | { ok: false; kind: AiError["kind"]; message: string; accountAction: boolean }> {
+export async function testAiConnection(): Promise<
+  { ok: true; model: string; keyHint: string | null } | { ok: false; kind: AiError["kind"]; message: string; accountAction: boolean; keyHint: string | null }
+> {
   const model = aiModel();
+  const keyHint = currentKeyHint();
   try {
     await openai().responses.create({ model, input: "Réponds OK.", max_output_tokens: 16, store: false });
-    return { ok: true, model };
+    return { ok: true, model, keyHint };
   } catch (error) {
     const aiError = classifyOpenAiError(error);
     if (aiError.kind !== "not_configured") console.error(`[IA] Test de connexion : ${aiError.kind} ${aiError.detail ?? ""}`);
-    return { ok: false, kind: aiError.kind, message: aiError.message, accountAction: ACCOUNT_ACTION_KINDS.includes(aiError.kind) };
+    return { ok: false, kind: aiError.kind, message: aiError.message, accountAction: ACCOUNT_ACTION_KINDS.includes(aiError.kind), keyHint };
   }
 }
 
@@ -63,7 +66,8 @@ export type AiUsageSummary = {
   monthCostUsd: number;
   monthCount: number;
   /** Dernier échec nécessitant une action, s'il est plus récent que la dernière réussite. */
-  lastAccountError: { kind: AiError["kind"]; at: Date } | null;
+  /** keyHint : indice « sk-…abcd » de la clé utilisée lors de l'échec (erreurs de clé uniquement). */
+  lastAccountError: { kind: AiError["kind"]; at: Date; keyHint: string | null } | null;
 };
 
 export async function getAiUsageSummary(configured: boolean): Promise<AiUsageSummary> {
@@ -91,7 +95,7 @@ export async function getAiUsageSummary(configured: boolean): Promise<AiUsageSum
   const failedKind = lastFailure?.errorMessage?.split(":")[0] as AiError["kind"] | undefined;
   const accountError =
     lastFailure && failedKind && ACCOUNT_ACTION_KINDS.includes(failedKind) && (!lastSuccess || lastFailure.createdAt > lastSuccess.createdAt)
-      ? { kind: failedKind, at: lastFailure.createdAt }
+      ? { kind: failedKind, at: lastFailure.createdAt, keyHint: /^\w+: \[clé ([^\]]+)\]/.exec(lastFailure.errorMessage ?? "")?.[1] ?? null }
       : null;
   return {
     configured,
