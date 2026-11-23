@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
-import { enforceWhiteBackground, scenePrompt, whitenNearWhite } from "./scenes-openai";
+import { enforceWhiteBackground, PACK_RULE, scenePrompt, SINGLE_ITEM_RULE, whitenNearWhite } from "./scenes-openai";
 import { cutoutModelPath } from "./studio-cutout";
 
 describe("photos « Générées par l'IA » : fond blanc par défaut", () => {
@@ -13,6 +13,13 @@ describe("photos « Générées par l'IA » : fond blanc par défaut", () => {
     expect(prompt).toMatch(/No workshop, no table or floor surface/);
     expect(prompt).not.toMatch(/wooden tabletop|gradient backdrop/);
     expect(prompt).toMatch(/STRICT RULES/); // le produit ne doit jamais être modifié
+  });
+
+  it("un seul exemplaire par défaut ; tous les articles si lot / pack", () => {
+    expect(scenePrompt(0, "white")).toContain(SINGLE_ITEM_RULE);
+    expect(SINGLE_ITEM_RULE).toMatch(/exactly ONE single unit/);
+    expect(scenePrompt(1, "scene", false)).toContain(PACK_RULE);
+    expect(scenePrompt(1, "scene", false)).not.toContain(SINGLE_ITEM_RULE);
   });
 
   it("décor seulement sur choix explicite « scene »", () => {

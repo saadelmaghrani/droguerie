@@ -180,14 +180,180 @@ export function uncertainRatio(alpha: Buffer): number {
   return visible ? uncertain / visible : 1;
 }
 
+/**
+ * Plusieurs EXEMPLAIRES identiques et séparés sur la photo (≥ 3 silhouettes de même taille et de même
+ * forme : présentoir, rangée de pinces…) → masque ne gardant que l'exemplaire principal (le plus grand ;
+ * à taille égale, le plus central). null si rien à isoler.
+ * Volontairement ≥ 3 : deux silhouettes identiques sont souvent UN article (paire de gants, de bottes).
+ * Des exemplaires qui se CHEVAUCHENT forment une seule silhouette : impossible à séparer sans redessiner
+ * (seule la génération IA le fait, voir SINGLE_ITEM_RULE dans scenes-openai.ts).
+ */
+export function isolateMainCopy(alpha: Buffer, width: number, height: number): Buffer | null {
+  // Analyse sur une version réduite (≤ 400 px) : rapide, suffisante pour compter des silhouettes.
+  const scale = Math.min(1, 400 / Math.max(width, height));
+  const sw = Math.max(1, Math.round(width * scale));
+  const sh = Math.max(1, Math.round(height * scale));
+  const solid = new Uint8Array(sw * sh);
+  for (let y = 0; y < sh; y++) {
+    for (let x = 0; x < sw; x++) {
+      const fx = Math.min(width - 1, Math.floor(x / scale));
+      const fy = Math.min(height - 1, Math.floor(y / scale));
+      solid[y * sw + x] = alpha[fy * width + fx]! > 128 ? 1 : 0;
+    }
+  }
+  // Composantes connexes (8 voisins), parcours en largeur.
+  const labels = new Int32Array(sw * sh);
+  const parts: { label: number; area: number; minX: number; minY: number; maxX: number; maxY: number; cx: number; cy: number }[] = [];
+  const queue = new Int32Array(sw * sh);
+  for (let start = 0; start < solid.length; start++) {
+    if (!solid[start] || labels[start]) continue;
+    const label = parts.length + 1;
+    const part = { label, area: 0, minX: sw, minY: sh, maxX: 0, maxY: 0, cx: 0, cy: 0 };
+    let head = 0;
+    let tail = 0;
+    queue[tail++] = start;
+    labels[start] = label;
+    while (head < tail) {
+      const i = queue[head++]!;
+      const x = i % sw;
+      const y = (i - x) / sw;
+      part.area++;
+      part.cx += x;
+      part.cy += y;
+      if (x < part.minX) part.minX = x;
+      if (x > part.maxX) part.maxX = x;
+      if (y < part.minY) part.minY = y;
+      if (y > part.maxY) part.maxY = y;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= sw || ny >= sh) continue;
+          const j = ny * sw + nx;
+          if (solid[j] && !labels[j]) {
+            labels[j] = label;
+            queue[tail++] = j;
+          }
+        }
+      }
+    }
+    part.cx /= part.area;
+    part.cy /= part.area;
+    parts.push(part);
+  }
+  const big = parts.filter((p) => p.area >= sw * sh * 0.005);
+  if (big.length < 3) return null;
+  const largest = big.reduce((a, b) => (b.area > a.area ? b : a));
+  const aspect = (p: (typeof parts)[number]) => (p.maxX - p.minX + 1) / (p.maxY - p.minY + 1);
+  const copies = big.filter((p) => p.area >= largest.area * 0.6 && Math.max(aspect(p) / aspect(largest), aspect(largest) / aspect(p)) <= 1.4);
+  if (copies.length < 3) return null;
+  // Principal : le plus grand ; à 10 % près, le plus proche du centre de la photo.
+  const centre = (p: (typeof parts)[number]) => Math.hypot(p.cx - sw / 2, p.cy - sh / 2);
+  const main = copies
+    .filter((p) => p.area >= largest.area * 0.9)
+    .reduce((a, b) => (centre(b) < centre(a) ? b : a));
+
+  // Masque pleine taille : on garde l'exemplaire principal (+ 1 pixel réduit de marge pour ses bords fondus).
+  const keep = (x: number, y: number) => {
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (nx >= 0 && ny >= 0 && nx < sw && ny < sh && labels[ny * sw + nx] === main.label) return true;
+      }
+    }
+    return false;
+  };
+  const out = Buffer.alloc(alpha.length);
+  for (let y = 0; y < height; y++) {
+    const sy = Math.min(sh - 1, Math.floor(y * scale));
+    for (let x = 0; x < width; x++) {
+      const i = y * width + x;
+      if (alpha[i] && keep(Math.min(sw - 1, Math.floor(x * scale)), sy)) out[i] = alpha[i]!;
+    }
+  }
+  return out;
+}
+
+/**
+ * Supprime les FRAGMENTS FANTÔMES : morceaux détachés du produit, pâles (semi-transparents) et petits —
+ * bout d'enseigne, reflet, étiquette du rayon que le détourage a gardés par hésitation.
+ * Un vrai accessoire (foret à côté de la perceuse) est net et opaque : il est conservé.
+ */
+export function dropGhostFragments(alpha: Buffer, width: number, height: number): Buffer {
+  const scale = Math.min(1, 400 / Math.max(width, height));
+  const sw = Math.max(1, Math.round(width * scale));
+  const sh = Math.max(1, Math.round(height * scale));
+  const small = new Uint8Array(sw * sh);
+  for (let y = 0; y < sh; y++) {
+    for (let x = 0; x < sw; x++) {
+      small[y * sw + x] = alpha[Math.min(height - 1, Math.floor(y / scale)) * width + Math.min(width - 1, Math.floor(x / scale))]!;
+    }
+  }
+  const labels = new Int32Array(sw * sh);
+  const areas: number[] = [0];
+  const sums: number[] = [0];
+  const queue = new Int32Array(sw * sh);
+  for (let start = 0; start < small.length; start++) {
+    if (small[start]! <= 16 || labels[start]) continue;
+    const label = areas.length;
+    let area = 0;
+    let sum = 0;
+    let head = 0;
+    let tail = 0;
+    queue[tail++] = start;
+    labels[start] = label;
+    while (head < tail) {
+      const i = queue[head++]!;
+      area++;
+      sum += small[i]!;
+      const x = i % sw;
+      const y = (i - x) / sw;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= sw || ny >= sh) continue;
+          const j = ny * sw + nx;
+          if (small[j]! > 16 && !labels[j]) {
+            labels[j] = label;
+            queue[tail++] = j;
+          }
+        }
+      }
+    }
+    areas.push(area);
+    sums.push(sum);
+  }
+  if (areas.length <= 2) return alpha; // une seule pièce : rien à nettoyer
+  const largest = Math.max(...areas);
+  const ghost = areas.map((area, label) => label > 0 && area < largest && ((sums[label]! / area < 150 && area < largest * 0.15) || area < largest * 0.003));
+  if (!ghost.some(Boolean)) return alpha;
+  const out = Buffer.from(alpha);
+  for (let y = 0; y < height; y++) {
+    const sy = Math.min(sh - 1, Math.floor(y * scale));
+    for (let x = 0; x < width; x++) {
+      if (ghost[labels[sy * sw + Math.min(sw - 1, Math.floor(x * scale))]!]) out[y * width + x] = 0;
+    }
+  }
+  return out;
+}
+
+export type CutoutOptions = {
+  /** true (défaut) : un seul exemplaire si plusieurs copies identiques sont visibles. false : lot / pack. */
+  singleItem?: boolean;
+};
+
 /** Produit détouré : pixels d'origine + transparence, recadré au plus près. Jamais redimensionné. */
 export type CutoutProduct = { png: Buffer; width: number; height: number };
 
 /** Photo d'origine (n'importe quel format lisible) → produit détouré. Lève AiError("no_subject"). */
-export async function cutoutProduct(original: Buffer): Promise<CutoutProduct> {
+export async function cutoutProduct(original: Buffer, options: CutoutOptions = {}): Promise<CutoutProduct> {
   const { data: rgb, info } = await sharp(original).autoOrient().removeAlpha().raw().toBuffer({ resolveWithObject: true });
   const { width, height } = info;
-  const alpha = refineAlpha(await cutoutMask(rgb, width, height));
+  let alpha = refineAlpha(await cutoutMask(rgb, width, height));
+  if (options.singleItem !== false) alpha = isolateMainCopy(alpha, width, height) ?? alpha;
+  alpha = dropGhostFragments(alpha, width, height);
   const box = alphaBounds(alpha, width, height);
   if (!box) throw new AiError("no_subject");
   if (uncertainRatio(alpha) > MAX_UNCERTAIN_RATIO) throw new AiError("no_subject", "détourage incertain");
@@ -340,6 +506,6 @@ export async function composeMontage(cut: CutoutProduct, style: MontageStyle): P
 }
 
 /** Photo d'origine → PNG fond blanc (raccourci : détourage + composeWhite). */
-export async function studioFromCutout(original: Buffer): Promise<Buffer> {
-  return composeWhite(await cutoutProduct(original));
+export async function studioFromCutout(original: Buffer, options: CutoutOptions = {}): Promise<Buffer> {
+  return composeWhite(await cutoutProduct(original, options));
 }

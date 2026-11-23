@@ -72,7 +72,7 @@ async function main() {
     if (!hasPhoto) {
       const buffer = readFileSync(item.image);
       // Même traitement que l'admin : détourage + fond blanc studio (originale conservée).
-      const processed = await processProductPhoto(new File([new Uint8Array(buffer)], "photo.jpg", { type: "image/jpeg" }), productId);
+      const processed = await processProductPhoto(new File([new Uint8Array(buffer)], "photo.jpg", { type: "image/jpeg" }), productId, name);
       if (processed.ok && (await addProductImage(productId, processed.photo)).ok) {
         hasPhoto = true;
         photos++;

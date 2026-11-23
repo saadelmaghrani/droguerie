@@ -2,7 +2,7 @@
 import { existsSync } from "node:fs";
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
-import { alphaBounds, composeMontage, composeWhite, MIN_STUDIO_SIDE, cutoutMask, cutoutModelPath, cutoutProduct, FILL_RATIO, MAX_UNCERTAIN_RATIO, montageLayout, refineAlpha, STUDIO_BACKGROUND, straightenAngle, studioFromCutout, uncertainRatio } from "./studio-cutout";
+import { alphaBounds, dropGhostFragments, isolateMainCopy, composeMontage, composeWhite, MIN_STUDIO_SIDE, cutoutMask, cutoutModelPath, cutoutProduct, FILL_RATIO, MAX_UNCERTAIN_RATIO, montageLayout, refineAlpha, STUDIO_BACKGROUND, straightenAngle, studioFromCutout, uncertainRatio } from "./studio-cutout";
 
 // Photo « amateur » synthétique : produit (flacon bleu + étiquette avec texte) sur un fond beige dégradé.
 async function fakeProductPhoto(): Promise<Buffer> {
@@ -167,5 +167,47 @@ describe("cadrage studio", () => {
       if (out.data[i]! > 150 && out.data[i + 1]! < 80) { first = x; break; }
     }
     expect(first / MIN_STUDIO_SIDE).toBeCloseTo((1 - FILL_RATIO) / 2, 2);
+  });
+});
+
+/** Masque avec des rectangles pleins [x, y, w, h]. */
+function rects(width: number, height: number, list: [number, number, number, number][]): Buffer {
+  const mask = Buffer.alloc(width * height);
+  for (const [x0, y0, w, h] of list) for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) mask[y * width + x] = 255;
+  return mask;
+}
+const count = (mask: Buffer, x0: number, x1: number) => {
+  let n = 0;
+  for (let i = 0; i < mask.length; i++) if (mask[i] && i % 600 >= x0 && i % 600 < x1) n++;
+  return n;
+};
+
+describe("un seul exemplaire (copies identiques séparées)", () => {
+  it("3 pinces côte à côte → seule celle du centre est gardée", () => {
+    const mask = rects(600, 400, [[40, 80, 120, 260], [240, 70, 120, 270], [440, 80, 120, 260]]);
+    const out = isolateMainCopy(mask, 600, 400)!;
+    expect(out).not.toBeNull();
+    expect(count(out, 0, 200)).toBe(0);
+    expect(count(out, 400, 600)).toBe(0);
+    expect(count(out, 200, 400)).toBe(120 * 270); // l'exemplaire principal, entier
+  });
+
+  it("2 silhouettes identiques (paire de gants) → gardées", () => {
+    expect(isolateMainCopy(rects(600, 400, [[60, 80, 200, 240], [340, 80, 200, 240]]), 600, 400)).toBeNull();
+  });
+
+  it("objets différents (perceuse + batterie + chargeur) → gardés", () => {
+    expect(isolateMainCopy(rects(600, 400, [[20, 40, 300, 300], [360, 200, 80, 60], [470, 150, 110, 120]]), 600, 400)).toBeNull();
+  });
+});
+
+describe("fragments fantômes", () => {
+  it("morceau détaché et pâle (bout d'enseigne) supprimé ; accessoire net conservé", () => {
+    const mask = rects(600, 400, [[100, 50, 200, 300], [420, 300, 60, 30], [420, 60, 40, 40]]);
+    for (let y = 300; y < 330; y++) for (let x = 420; x < 480; x++) mask[y * 600 + x] = 90; // pâle
+    const out = dropGhostFragments(mask, 600, 400);
+    expect(out[315 * 600 + 450]).toBe(0); // fantôme retiré
+    expect(out[80 * 600 + 440]).toBe(255); // accessoire opaque gardé
+    expect(out[200 * 600 + 200]).toBe(255); // produit intact
   });
 });

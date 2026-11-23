@@ -26,6 +26,17 @@ const STRICT_RULES = `STRICT RULES — the product must remain exactly as in the
 - The whole product stays visible and uncropped. No text overlay, no watermark.`;
 
 /**
+ * UN SEUL ARTICLE (par défaut) : en magasin, le produit est souvent photographié en présentoir (plusieurs
+ * exemplaires suspendus ou alignés les uns derrière les autres). La fiche vend UN article : on ne garde que
+ * l'exemplaire de devant. Exception : produit vendu en lot / pack (isMultiPack, d'après le nom et les notes).
+ */
+export const SINGLE_ITEM_RULE = `QUANTITY: show exactly ONE single unit of the product. If the photo shows several identical units —
+stacked, hanging on a display hook, overlapping, or lined up behind each other — keep only the front-most, most complete unit and
+remove all the other units entirely (no partial copies, no extra handles, edges, tags or packaging of the other units behind it).
+The kept unit must remain identical to the original (same packaging, label and details).`;
+export const PACK_RULE = `QUANTITY: this product is sold as a set / pack: keep every item that belongs to the set, exactly as shown.`;
+
+/**
  * PAR DÉFAUT : photo « packshot » sur blanc pur, comme la photo principale. Deux variantes d'éclairage,
  * même cadrage. Aucun décor (atelier, table, sol), aucun fond coloré ou dégradé.
  */
@@ -55,8 +66,8 @@ reflection and gentle rim lighting. Product centered, slightly larger in frame, 
 ${STRICT_RULES}`,
 ] as const;
 
-export function scenePrompt(index: 0 | 1, background: SceneBackground): string {
-  return (background === "scene" ? SCENE_PROMPTS : WHITE_PROMPTS)[index];
+export function scenePrompt(index: 0 | 1, background: SceneBackground, singleItem = true): string {
+  return `${(background === "scene" ? SCENE_PROMPTS : WHITE_PROMPTS)[index]}\n${singleItem ? SINGLE_ITEM_RULE : PACK_RULE}`;
 }
 
 /**
@@ -64,9 +75,9 @@ export function scenePrompt(index: 0 | 1, background: SceneBackground): string {
  * L'image produite est détourée localement puis recadrée exactement comme la photo principale :
  * blanc #FFFFFF, produit centré, 12 % de marge. Si le détourage échoue : fond quasi blanc forcé à #FFFFFF.
  */
-export async function enforceWhiteBackground(png: Buffer): Promise<Buffer> {
+export async function enforceWhiteBackground(png: Buffer, singleItem = true): Promise<Buffer> {
   try {
-    return await composeWhite(await cutoutProduct(png));
+    return await composeWhite(await cutoutProduct(png, { singleItem }));
   } catch {
     return whitenNearWhite(png);
   }
@@ -103,6 +114,8 @@ export async function sceneFromOpenAi(
   original: Buffer,
   index: 0 | 1,
   background: SceneBackground = "white",
+  /** false : lot / pack (tous les articles gardés). */
+  singleItem = true,
 ): Promise<{ png: Buffer; model: string; inputTokens: number; outputTokens: number }> {
   const model = aiImageModel();
   const client = openai(); // lève not_configured si la clé est absente
@@ -111,7 +124,7 @@ export async function sceneFromOpenAi(
     {
       model,
       image: await toFile(input, "produit.png", { type: "image/png" }),
-      prompt: scenePrompt(index, background),
+      prompt: scenePrompt(index, background, singleItem),
       size: "1024x1024",
       quality: "medium", // ≈ 4 fois moins cher que « high », suffisant pour une vignette catalogue
       background: "opaque",
@@ -123,7 +136,7 @@ export async function sceneFromOpenAi(
   if (!b64) throw new AiError("bad_response", "aucune image renvoyée");
   const generated = Buffer.from(b64, "base64");
   return {
-    png: background === "white" ? await enforceWhiteBackground(generated) : generated,
+    png: background === "white" ? await enforceWhiteBackground(generated, singleItem) : generated,
     model,
     inputTokens: response.usage?.input_tokens ?? 0,
     outputTokens: response.usage?.output_tokens ?? 0,

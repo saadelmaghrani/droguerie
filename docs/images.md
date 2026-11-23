@@ -80,3 +80,16 @@ trop incertain (> 35 % : affiche publicitaire, visuel graphique, objet transpare
 
 Limite : pas de correction de **perspective** (photo prise en plongée) : un modèle 2D ne peut pas
 « redresser » un objet en 3D sans le redessiner, ce qui trahirait le produit.
+
+### Un seul article mis en avant
+
+- **Lot / pack ?** `isMultiPack(nom, notes)` (`src/lib/multi-pack.ts`) : lot, pack, kit, jeu, set, coffret,
+  assortiment, paire, boîte de…, x10, 19pcs, 10 pièces (pas les dimensions « 5 m x 19 mm »).
+- **Copies séparées** (local, fidèle au pixel) : `isolateMainCopy` — ≥ 3 silhouettes de même taille et forme →
+  seul l'exemplaire principal (le plus grand, puis le plus central) est gardé. 2 silhouettes = souvent une paire :
+  gardées. Ignoré pour un lot / pack.
+- **Fragments fantômes** : `dropGhostFragments` retire les morceaux détachés, pâles et petits (bout d'enseigne,
+  reflet) ; un accessoire net et opaque est conservé.
+- **Copies qui se chevauchent** (présentoir, pinces suspendues) : une seule silhouette, impossible à séparer sans
+  redessiner. Le détourage local fait souvent ressortir l'article de devant ; pour les photos générées par l'IA,
+  la consigne `SINGLE_ITEM_RULE` (`scenes-openai.ts`) impose UN exemplaire (sinon `PACK_RULE`).

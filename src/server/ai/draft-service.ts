@@ -17,6 +17,7 @@ import { prisma } from "@/lib/prisma";
 import { deleteImageFiles, processImage, type ProcessedImage } from "@/server/media/images";
 import { localStorage } from "@/server/media/storage";
 import type { AiGenerationType } from "@/generated/prisma/client";
+import { isMultiPack } from "@/lib/multi-pack";
 import { DEFAULT_SCENE_BACKGROUND, type ExtraCount, type ExtraKind, type SceneBackground } from "@/lib/ai-costs";
 import { ACCOUNT_ACTION_KINDS, AiError, classifyOpenAiError } from "./errors";
 import { generateProductText } from "./product-text";
@@ -145,8 +146,10 @@ export async function createProductDraft(
     if (overBudget) throw overBudget;
   };
 
+  // Un seul exemplaire mis en avant, sauf lot / pack (d'après le nom saisi et les notes pour l'IA).
+  const singleItem = !isMultiPack(hints.name, hints.notes);
   // Détourage UNE fois, réutilisé pour la photo principale et les montages.
-  const cutout: Promise<CutoutProduct> = cutoutProduct(full);
+  const cutout: Promise<CutoutProduct> = cutoutProduct(full, { singleItem });
   cutout.catch(() => {}); // l'erreur est traitée par chaque partie qui l'attend
 
   const studio = runPart<DraftImage>(ctx, "IMAGE_STUDIO", "local", "isnet-general-use", async () => {
@@ -165,7 +168,7 @@ export async function createProductDraft(
         const slot: ExtraSlot = index === 0 ? "ai-0" : "ai-1";
         return runPart<DraftImage>(ctx, "IMAGE_SCENE", "openai", "", async () => {
           guard();
-          const result = await sceneFromOpenAi(full, index, background);
+          const result = await sceneFromOpenAi(full, index, background, singleItem);
           const image = toDraftImage(await storePng(result.png, draftId, `${slot}.png`));
           return {
             value: image,

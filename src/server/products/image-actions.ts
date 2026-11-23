@@ -28,7 +28,7 @@ export async function uploadProductImage(productId: string, formData: FormData):
   await requireAdmin();
   if (!uuid.safeParse(productId).success || !(formData instanceof FormData)) return INVALID;
 
-  const product = await prisma.product.findUnique({ where: { id: productId }, select: { id: true } });
+  const product = await prisma.product.findUnique({ where: { id: productId }, select: { id: true, name: true } });
   if (!product) return { ok: false, message: "Ce produit n'existe plus." };
   // Vérification AVANT le traitement (coûteux) de l'image.
   if ((await countProductImages(productId)) >= MAX_PRODUCT_IMAGES) {
@@ -37,7 +37,7 @@ export async function uploadProductImage(productId: string, formData: FormData):
 
   const upload = readUploadedFile(formData.get("file"));
   if (!upload.ok) return { ok: false, message: upload.error };
-  const processed = await processProductPhoto(upload.file, productId);
+  const processed = await processProductPhoto(upload.file, productId, product.name);
   if (!processed.ok) return { ok: false, message: processed.error };
 
   const result = await addProductImage(productId, processed.photo);
@@ -51,12 +51,12 @@ export async function uploadProductImage(productId: string, formData: FormData):
 export async function replaceProductImageFile(imageId: string, formData: FormData): Promise<ImageServiceResult> {
   await requireAdmin();
   if (!uuid.safeParse(imageId).success || !(formData instanceof FormData)) return INVALID;
-  const image = await prisma.productImage.findUnique({ where: { id: imageId }, select: { productId: true } });
+  const image = await prisma.productImage.findUnique({ where: { id: imageId }, select: { productId: true, product: { select: { name: true } } } });
   if (!image) return { ok: false, message: "Cette photo n'existe plus." };
 
   const upload = readUploadedFile(formData.get("file"));
   if (!upload.ok) return { ok: false, message: upload.error };
-  const processed = await processProductPhoto(upload.file, image.productId);
+  const processed = await processProductPhoto(upload.file, image.productId, image.product.name);
   if (!processed.ok) return { ok: false, message: processed.error };
 
   const result = await replaceProductImage(imageId, processed.photo);
