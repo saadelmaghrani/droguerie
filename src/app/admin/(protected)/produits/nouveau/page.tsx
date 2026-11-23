@@ -18,7 +18,7 @@ async function NewProductContent() {
 export default function NewProductPage() {
   return (
     <>
-      <PageHeader title="Nouveau produit" description="Le produit est créé en brouillon par défaut." />
+      <PageHeader title="Nouveau produit" description="Le produit est publié dès sa création (photo principale obligatoire). Choisissez « Brouillon » pour le préparer sans le montrer." />
       <Suspense fallback={<Skeleton className="h-[32rem] rounded-xl" />}>
         <NewProductContent />
       </Suspense>

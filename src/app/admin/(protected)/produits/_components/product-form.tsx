@@ -71,7 +71,7 @@ export function ProductForm({
     reference: "",
     brand: "",
     categoryId: "",
-    status: "DRAFT",
+    status: "PUBLISHED", // publié par défaut (réellement publié une fois la photo principale en place)
     isFeatured: false,
   };
   const [values, setValues] = useState<ProductFormValues>(initial);
