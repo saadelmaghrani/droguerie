@@ -7,8 +7,7 @@ import { invalidateCatalogue } from "@/server/catalogue/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/server/auth/dal";
-import { readUploadedFile } from "@/server/media/images";
-import { previewProductPhoto, processProductPhoto } from "./studio-photo";
+import { processImage, readUploadedFile } from "@/server/media/images";
 import {
   addProductImage,
   countProductImages,
@@ -28,7 +27,7 @@ export async function uploadProductImage(productId: string, formData: FormData):
   await requireAdmin();
   if (!uuid.safeParse(productId).success || !(formData instanceof FormData)) return INVALID;
 
-  const product = await prisma.product.findUnique({ where: { id: productId }, select: { id: true, name: true } });
+  const product = await prisma.product.findUnique({ where: { id: productId }, select: { id: true } });
   if (!product) return { ok: false, message: "Ce produit n'existe plus." };
   // Vérification AVANT le traitement (coûteux) de l'image.
   if ((await countProductImages(productId)) >= MAX_PRODUCT_IMAGES) {
@@ -37,50 +36,36 @@ export async function uploadProductImage(productId: string, formData: FormData):
 
   const upload = readUploadedFile(formData.get("file"));
   if (!upload.ok) return { ok: false, message: upload.error };
-  const processed = await processProductPhoto(upload.file, productId, product.name);
+  // Mode manuel : photo enregistrée telle qu'envoyée (redressée selon l'EXIF, métadonnées retirées,
+  // déclinée en WebP) — aucun détourage, aucun fond blanc, aucune IA.
+  const processed = await processImage(upload.file, "product", productId);
   if (!processed.ok) return { ok: false, message: processed.error };
 
-  const result = await addProductImage(productId, processed.photo);
+  const result = await addProductImage(productId, processed.image);
   if (result.ok) {
     refresh();
     invalidateCatalogue();
   }
-  return withStudioMessage(result, processed);
+  return result;
 }
 
 export async function replaceProductImageFile(imageId: string, formData: FormData): Promise<ImageServiceResult> {
   await requireAdmin();
   if (!uuid.safeParse(imageId).success || !(formData instanceof FormData)) return INVALID;
-  const image = await prisma.productImage.findUnique({ where: { id: imageId }, select: { productId: true, product: { select: { name: true } } } });
+  const image = await prisma.productImage.findUnique({ where: { id: imageId }, select: { productId: true } });
   if (!image) return { ok: false, message: "Cette photo n'existe plus." };
 
   const upload = readUploadedFile(formData.get("file"));
   if (!upload.ok) return { ok: false, message: upload.error };
-  const processed = await processProductPhoto(upload.file, image.productId, image.product.name);
+  const processed = await processImage(upload.file, "product", image.productId);
   if (!processed.ok) return { ok: false, message: processed.error };
 
-  const result = await replaceProductImage(imageId, processed.photo);
+  const result = await replaceProductImage(imageId, processed.image);
   if (result.ok) {
     refresh();
     invalidateCatalogue();
   }
-  return withStudioMessage(result, processed);
-}
-
-/** Message affiché : précise si la photo a été détourée sur fond blanc, ou pourquoi elle ne l'a pas été. */
-function withStudioMessage(result: ImageServiceResult, processed: Extract<Awaited<ReturnType<typeof processProductPhoto>>, { ok: true }>): ImageServiceResult {
-  if (!result.ok) return result;
-  if (processed.notice) return { ok: true, message: `${result.message} ${processed.notice}` };
-  return { ok: true, message: `${result.message.replace(/\.$/, "")}, détourée sur fond blanc.` };
-}
-
-/** Aperçu « fond blanc » d'une photo choisie sur « Nouveau produit » (rien n'est enregistré). */
-export async function previewStudioPhoto(formData: FormData) {
-  await requireAdmin();
-  if (!(formData instanceof FormData)) return { ok: false as const, error: "Requête invalide." };
-  const upload = readUploadedFile(formData.get("file"));
-  if (!upload.ok) return { ok: false as const, error: upload.error };
-  return previewProductPhoto(upload.file, String(formData.get("name") ?? "").slice(0, 200));
+  return result;
 }
 
 async function run(imageId: unknown, operation: (id: string) => Promise<ImageServiceResult>): Promise<ImageServiceResult> {

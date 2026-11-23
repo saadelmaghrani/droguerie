@@ -119,7 +119,9 @@ export function ProductImages({
         })}
       </ul>
       <p className="text-xs text-muted-foreground">
-        La photo principale apparaît dans le catalogue. Les métadonnées (dont la position GPS) sont supprimées à l&apos;envoi.
+        Jusqu&apos;à 3 photos, enregistrées telles que vous les envoyez. La photo principale (la première) est affichée dans le
+        catalogue : utilisez « Définir comme principale », les flèches pour changer l&apos;ordre, ou remplacez / supprimez une
+        photo. Les métadonnées (dont la position GPS) sont retirées à l&apos;envoi.
       </p>
 
       <AlertDialog open={toDelete !== null} onOpenChange={(open) => !open && !isPending && setToDelete(null)}>
@@ -222,11 +224,6 @@ function FilledSlot({
         <Button type="button" variant="ghost" size="icon-sm" disabled={disabled || !canMoveRight} onClick={() => onMove("right")} aria-label={`Déplacer la photo ${position} vers la droite`}>
           <ArrowRight aria-hidden />
         </Button>
-        {image.position !== 0 && (
-          <Button type="button" variant="ghost" size="icon-sm" disabled={disabled} onClick={onPrimary} aria-label={`Définir la photo ${position} comme principale`} title="Définir comme principale">
-            <Star aria-hidden />
-          </Button>
-        )}
         <Button type="button" variant="ghost" size="icon-sm" disabled={disabled} onClick={picker.open} aria-label={`Remplacer la photo ${position}`} title="Remplacer">
           <RefreshCw aria-hidden />
         </Button>
@@ -234,6 +231,12 @@ function FilledSlot({
           <Trash2 aria-hidden />
         </Button>
       </div>
+      {image.position !== 0 && (
+        <Button type="button" variant="outline" size="sm" disabled={disabled} onClick={onPrimary} className="h-auto justify-start py-1.5 text-left whitespace-normal">
+          <Star aria-hidden />
+          Définir comme principale
+        </Button>
+      )}
       {image.originalStorageKey && (
         <Button type="button" variant="ghost" size="sm" disabled={disabled} onClick={onRestore} className="h-auto justify-start py-1.5 text-left whitespace-normal">
           <Undo2 aria-hidden />

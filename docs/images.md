@@ -61,10 +61,18 @@ Remplacer une image crée une nouvelle clé et supprime les anciens fichiers.
 - Optimisation possible : Caddy sert directement `UPLOAD_DIR` sous `/media` (la route Next.js reste
   la référence fonctionnelle).
 
-## Photo « studio » automatique (photos produit)
+## Section « Photos » de l'admin : mode MANUEL
 
-Toute photo produit ajoutée ou remplacée — admin (création, fiche), script `import:demo` — passe par
-`processProductPhoto` (`src/server/products/studio-photo.ts`) :
+Les photos ajoutées ou remplacées dans la section « Photos » (création et fiche produit) sont enregistrées
+**telles qu'envoyées** : redressées selon l'EXIF, métadonnées (GPS) retirées, déclinées en WebP — aucun
+détourage, aucun fond blanc, aucune IA (`image-actions.ts` → `processImage`). 3 photos maximum ; la 1re est la
+principale (« Définir comme principale », flèches, remplacer, supprimer). Le fond blanc et l'IA restent
+disponibles uniquement via la carte « Générer avec l'IA » de la page « Nouveau produit ».
+
+## Photo « studio » (fond blanc) — import de démonstration et carte IA
+
+Le script `import:demo` passe par `processProductPhoto` (`src/server/products/studio-photo.ts`) ; la carte
+« Générer avec l'IA » utilise les mêmes fonctions de `studio-cutout.ts` :
 
 1. **Détourage local** : modèle ISNet (`npm run ai:model`, ≈ 170 Mo, gratuit, sur le serveur, ~3 s/photo).
    Le fond d'origine (établi, table, chantier, sol, logos/filigranes) est supprimé.
