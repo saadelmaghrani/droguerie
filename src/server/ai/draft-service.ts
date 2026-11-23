@@ -46,7 +46,15 @@ export type DraftResult =
 
 /** 3 photos maximum par produit : la principale + 2 supplémentaires. */
 export const MAX_EXTRAS = 2;
-export type DraftChoice = { main: "studio" | "original"; keep: ExtraSlot[] };
+/** Photos générées par l'IA proposables comme photo principale. */
+export const AI_SLOTS = ["ai-0", "ai-1"] as const satisfies readonly ExtraSlot[];
+export type AiSlot = (typeof AI_SLOTS)[number];
+/**
+ * main : photo générée par l'IA (« ai-0 »/« ai-1 »), fond blanc local (« studio ») ou photo d'origine.
+ * Sauf si « original » est choisie, la photo d'origine n'est PAS publiée : elle est gardée en sauvegarde
+ * (original_storage_key) pour « Revenir à la photo d'origine ».
+ */
+export type DraftChoice = { main: "studio" | "original" | AiSlot; keep: ExtraSlot[] };
 
 const DRAFT_TTL_MS = 24 * 60 * 60 * 1000;
 const MONTAGES: { slot: ExtraSlot; style: MontageStyle }[] = [
@@ -210,21 +218,27 @@ export async function attachDraftToProduct(productId: string, draftId: string, c
   const extraGens = generations.filter((g) => g.type !== "TEXT" && outputOf(g).role === "extra");
 
   const useStudio = choice.main === "studio" && studioGen !== undefined;
+  // Photo IA choisie comme principale (et réellement générée).
+  const mainAi = extraGens.find((g) => g.type === "IMAGE_SCENE" && outputOf(g).slot === choice.main);
   // Ordre d'affichage : celui des emplacements proposés ; 2 au maximum (3 photos par produit).
-  const keptExtras = EXTRA_SLOTS.filter((slot) => choice.keep.includes(slot))
+  // La photo devenue principale n'est pas ajoutée une seconde fois en photo supplémentaire.
+  const keptExtras = EXTRA_SLOTS.filter((slot) => choice.keep.includes(slot) && slot !== choice.main)
     .map((slot) => extraGens.find((g) => outputOf(g).slot === slot))
     .filter((g): g is (typeof generations)[number] => g !== undefined)
     .slice(0, MAX_EXTRAS);
   const unused = [
-    ...(studioGen && !useStudio ? [outputOf(studioGen).key] : []),
-    ...extraGens.filter((g) => !keptExtras.includes(g)).map((g) => outputOf(g).key),
+    ...(studioGen && (!useStudio || mainAi) ? [outputOf(studioGen).key] : []),
+    ...extraGens.filter((g) => !keptExtras.includes(g) && g !== mainAi).map((g) => outputOf(g).key),
   ];
 
   const result = await prisma.$transaction(async (tx) => {
     if ((await tx.productImage.count({ where: { productId } })) > 0) return null; // produit déjà illustré
-    const main = useStudio
-      ? { storageKey: outputOf(studioGen!).key, width: outputOf(studioGen!).width, height: outputOf(studioGen!).height, source: "AI_STUDIO" as const, originalStorageKey: draft.originalKey }
-      : { storageKey: draft.originalKey, width: draft.originalWidth, height: draft.originalHeight, source: "ORIGINAL" as const, originalStorageKey: null };
+    // Photo principale IA ou fond blanc : la photo d'origine est seulement conservée en sauvegarde (non publiée).
+    const main = mainAi
+      ? { storageKey: outputOf(mainAi).key, width: outputOf(mainAi).width, height: outputOf(mainAi).height, source: "AI_GENERATED" as const, originalStorageKey: draft.originalKey }
+      : useStudio
+        ? { storageKey: outputOf(studioGen!).key, width: outputOf(studioGen!).width, height: outputOf(studioGen!).height, source: "AI_STUDIO" as const, originalStorageKey: draft.originalKey }
+        : { storageKey: draft.originalKey, width: draft.originalWidth, height: draft.originalHeight, source: "ORIGINAL" as const, originalStorageKey: null };
     const rows = [
       main,
       ...keptExtras.map((g) => ({
@@ -237,7 +251,7 @@ export async function attachDraftToProduct(productId: string, draftId: string, c
       })),
     ];
     await tx.productImage.createMany({ data: rows.map((r, position) => ({ ...r, productId, position })) });
-    const accepted = new Set([...(useStudio ? [studioGen!.id] : []), ...keptExtras.map((g) => g.id), ...generations.filter((g) => g.type === "TEXT").map((g) => g.id)]);
+    const accepted = new Set([...(mainAi ? [mainAi.id] : useStudio ? [studioGen!.id] : []), ...keptExtras.map((g) => g.id), ...generations.filter((g) => g.type === "TEXT").map((g) => g.id)]);
     for (const g of generations) {
       await tx.aiGeneration.update({ where: { id: g.id }, data: { productId, status: accepted.has(g.id) ? "ACCEPTED" : "REJECTED", decidedAt: new Date() } });
     }

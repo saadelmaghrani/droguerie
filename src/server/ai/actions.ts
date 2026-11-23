@@ -50,7 +50,7 @@ export async function generateProductDraftAction(formData: FormData): Promise<Dr
 }
 
 const choiceSchema = z.object({
-  main: z.enum(["studio", "original"]),
+  main: z.enum(["studio", "original", "ai-0", "ai-1"]),
   keep: z.array(z.enum(EXTRA_SLOTS)).max(MAX_EXTRAS),
 });
 

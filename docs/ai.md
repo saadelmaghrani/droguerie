@@ -139,3 +139,13 @@ Modèle de détourage : `npm run ai:model` une fois par machine **et sur le serv
 - **Indication contraire** : choix « Fond des photos IA → Mise en scène (table, studio) » dans la carte
   « Générer avec l'IA » (`sceneBackground = "scene"`) : anciennes consignes `SCENE_PROMPTS`, image non retouchée.
 - Libellés : « Fond blanc IA n » / « Mise en scène IA n ». Les montages locaux (gratuits) sont inchangés.
+
+## Photo principale après génération
+
+- **Par défaut** (`defaultDraftChoice`, `draft-photos.tsx`) : la 1re photo « Générée par l'IA » devient la photo
+  principale ; sans photo IA : fond blanc (détourage) ; sinon la photo d'origine.
+- Choix proposés : Générée par l'IA (recommandé) · variante IA · Fond blanc (détourage) · Photo d'origine.
+  La photo choisie comme principale n'est pas reproposée en photo supplémentaire.
+- **Photo d'origine = sauvegarde** (`attachDraftToProduct`) : si la principale est une photo IA ou le fond blanc,
+  l'originale n'est PAS publiée ; elle est gardée dans `original_storage_key` → « Revenir à la photo d'origine ».
+  Elle n'est publiée que si l'admin choisit explicitement « Photo d'origine ».
