@@ -5,7 +5,7 @@
 // Format : [{ sourceId, name, category, specs: string[], image: "/chemin/photo.jpg", sourceUrl? }]
 // - Catégories créées si absentes (pictogramme suggéré automatiquement).
 // - Référence « OM-<sourceId> » : relancer le script met à jour au lieu de créer des doublons.
-// - Photo principale traitée comme dans l'admin (WebP 320/800/1600, sans métadonnées) ; produit publié
+// - Photo principale traitée comme dans l'admin (détourage fond blanc, WebP 320/800/1600, sans métadonnées) ; produit publié
 //   seulement s'il a sa photo (règle « photo obligatoire »).
 // - Descriptions RÉDIGÉES ici à partir des caractéristiques (faits), pas recopiées.
 //
@@ -14,7 +14,7 @@
 import { readFileSync } from "node:fs";
 import { prisma } from "@/lib/prisma";
 import { slugify } from "@/lib/slug";
-import { processImage } from "@/server/media/images";
+import { processProductPhoto } from "@/server/products/studio-photo";
 import { addProductImage } from "@/server/products/images-service";
 import { brandFromName, cleanName, writeDescription } from "./demo-product-text";
 
@@ -71,10 +71,12 @@ async function main() {
 
     if (!hasPhoto) {
       const buffer = readFileSync(item.image);
-      const processed = await processImage(new File([new Uint8Array(buffer)], "photo.jpg", { type: "image/jpeg" }), "product", productId);
-      if (processed.ok && (await addProductImage(productId, processed.image)).ok) {
+      // Même traitement que l'admin : détourage + fond blanc studio (originale conservée).
+      const processed = await processProductPhoto(new File([new Uint8Array(buffer)], "photo.jpg", { type: "image/jpeg" }), productId);
+      if (processed.ok && (await addProductImage(productId, processed.photo)).ok) {
         hasPhoto = true;
         photos++;
+        if (processed.notice) console.warn(`  ! ${name} : ${processed.notice}`);
       } else console.warn(`  ! photo refusée pour « ${name} » : ${processed.ok ? "enregistrement" : processed.error}`);
     }
     // Photo obligatoire pour publier : sans photo, le produit reste en brouillon.

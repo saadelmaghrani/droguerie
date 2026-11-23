@@ -7,7 +7,8 @@ import { invalidateCatalogue } from "@/server/catalogue/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/server/auth/dal";
-import { processImage, readUploadedFile } from "@/server/media/images";
+import { readUploadedFile } from "@/server/media/images";
+import { processProductPhoto } from "./studio-photo";
 import {
   addProductImage,
   countProductImages,
@@ -36,15 +37,15 @@ export async function uploadProductImage(productId: string, formData: FormData):
 
   const upload = readUploadedFile(formData.get("file"));
   if (!upload.ok) return { ok: false, message: upload.error };
-  const processed = await processImage(upload.file, "product", productId);
+  const processed = await processProductPhoto(upload.file, productId);
   if (!processed.ok) return { ok: false, message: processed.error };
 
-  const result = await addProductImage(productId, processed.image);
+  const result = await addProductImage(productId, processed.photo);
   if (result.ok) {
     refresh();
     invalidateCatalogue();
   }
-  return result;
+  return withStudioMessage(result, processed);
 }
 
 export async function replaceProductImageFile(imageId: string, formData: FormData): Promise<ImageServiceResult> {
@@ -55,15 +56,22 @@ export async function replaceProductImageFile(imageId: string, formData: FormDat
 
   const upload = readUploadedFile(formData.get("file"));
   if (!upload.ok) return { ok: false, message: upload.error };
-  const processed = await processImage(upload.file, "product", image.productId);
+  const processed = await processProductPhoto(upload.file, image.productId);
   if (!processed.ok) return { ok: false, message: processed.error };
 
-  const result = await replaceProductImage(imageId, processed.image);
+  const result = await replaceProductImage(imageId, processed.photo);
   if (result.ok) {
     refresh();
     invalidateCatalogue();
   }
-  return result;
+  return withStudioMessage(result, processed);
+}
+
+/** Message affiché : précise si la photo a été détourée sur fond blanc, ou pourquoi elle ne l'a pas été. */
+function withStudioMessage(result: ImageServiceResult, processed: Extract<Awaited<ReturnType<typeof processProductPhoto>>, { ok: true }>): ImageServiceResult {
+  if (!result.ok) return result;
+  if (processed.notice) return { ok: true, message: `${result.message} ${processed.notice}` };
+  return { ok: true, message: `${result.message.replace(/\.$/, "")}, détourée sur fond blanc.` };
 }
 
 async function run(imageId: unknown, operation: (id: string) => Promise<ImageServiceResult>): Promise<ImageServiceResult> {

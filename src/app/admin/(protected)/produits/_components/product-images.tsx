@@ -199,7 +199,7 @@ function FilledSlot({
         {image.originalStorageKey && (
           <Badge variant="secondary" className="absolute right-2 bottom-2">
             <Wand2 className="size-3" aria-hidden />
-            Fond blanc IA
+            Fond blanc auto
           </Badge>
         )}
         {image.source === "AI_GENERATED" && (

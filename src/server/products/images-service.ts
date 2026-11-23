@@ -11,6 +11,21 @@ import { localStorage } from "@/server/media/storage";
 export const MAX_PRODUCT_IMAGES = 3;
 export type ImageServiceResult = { ok: true; message: string } | { ok: false; message: string };
 
+/** Photo à enregistrer : fichiers traités + origine (studio automatique ou photo telle quelle). */
+export type NewProductImage = ProcessedImage & { source?: "ORIGINAL" | "AI_STUDIO"; originalStorageKey?: string | null };
+
+async function deleteNewImageFiles(image: NewProductImage) {
+  await Promise.all([image.key, image.originalStorageKey].filter((k): k is string => Boolean(k)).map((k) => deleteImageFiles(k, "product")));
+}
+
+const imageData = (image: NewProductImage) => ({
+  storageKey: image.key,
+  width: image.width,
+  height: image.height,
+  source: image.source ?? "ORIGINAL",
+  originalStorageKey: image.originalStorageKey ?? null,
+});
+
 export type ProductImageRow = { id: string; position: number; storageKey: string; width: number; height: number };
 
 const NOT_FOUND: ImageServiceResult = { ok: false, message: "Cette photo n'existe plus." };
@@ -28,24 +43,24 @@ export async function countProductImages(productId: string): Promise<number> {
 }
 
 /** Ajoute une photo au premier emplacement libre. En cas d'échec, les fichiers sont supprimés. */
-export async function addProductImage(productId: string, image: ProcessedImage): Promise<ImageServiceResult> {
+export async function addProductImage(productId: string, image: NewProductImage): Promise<ImageServiceResult> {
   try {
     const position = await prisma.$transaction(async (tx) => {
       const used = new Set((await tx.productImage.findMany({ where: { productId }, select: { position: true } })).map((i) => i.position));
       const free = [0, 1, 2].find((p) => !used.has(p));
       if (free === undefined) return null;
       await tx.productImage.create({
-        data: { productId, position: free, storageKey: image.key, width: image.width, height: image.height, source: "ORIGINAL" },
+        data: { productId, position: free, ...imageData(image) },
       });
       return free;
     });
     if (position === null) {
-      await deleteImageFiles(image.key, "product");
+      await deleteNewImageFiles(image);
       return { ok: false, message: `Ce produit a déjà ${MAX_PRODUCT_IMAGES} photos. Supprimez-en une d'abord.` };
     }
     return { ok: true, message: position === 0 ? "Photo principale ajoutée." : "Photo ajoutée." };
   } catch (error) {
-    await deleteImageFiles(image.key, "product");
+    await deleteNewImageFiles(image);
     // Deux envois simultanés sur le même emplacement : la base refuse le second (unicité).
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       return { ok: false, message: "Un autre envoi est en cours sur ce produit. Réessayez." };
@@ -55,16 +70,13 @@ export async function addProductImage(productId: string, image: ProcessedImage):
 }
 
 /** Remplace le fichier d'une photo existante (même emplacement). */
-export async function replaceProductImage(imageId: string, image: ProcessedImage): Promise<ImageServiceResult> {
+export async function replaceProductImage(imageId: string, image: NewProductImage): Promise<ImageServiceResult> {
   const current = await prisma.productImage.findUnique({ where: { id: imageId } });
   if (!current) {
-    await deleteImageFiles(image.key, "product");
+    await deleteNewImageFiles(image);
     return NOT_FOUND;
   }
-  await prisma.productImage.update({
-    where: { id: imageId },
-    data: { storageKey: image.key, width: image.width, height: image.height, source: "ORIGINAL", originalStorageKey: null },
-  });
+  await prisma.productImage.update({ where: { id: imageId }, data: imageData(image) });
   // Photo fond studio remplacée : sa version originale conservée n'a plus d'usage non plus.
   await Promise.all(
     [current.storageKey, current.originalStorageKey].filter((k): k is string => Boolean(k)).map((k) => deleteImageFiles(k, "product")),
@@ -141,7 +153,7 @@ export async function productImageKeys(productId: string): Promise<string[]> {
     .filter((k): k is string => Boolean(k));
 }
 
-/** Photo fond blanc (IA) → retour à la photo d'origine, conservée lors de la création. */
+/** Photo fond blanc (studio) → retour à la photo d'origine, conservée lors de la création. */
 export async function restoreOriginalImage(imageId: string): Promise<ImageServiceResult> {
   const image = await prisma.productImage.findUnique({ where: { id: imageId } });
   if (!image) return NOT_FOUND;

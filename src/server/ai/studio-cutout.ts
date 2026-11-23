@@ -15,8 +15,8 @@ import { AiError } from "./errors";
 
 const SIZE = 1024;
 export const STUDIO_BACKGROUND = { r: 255, g: 255, b: 255 }; // fond blanc pur uniforme
-/** Le produit occupe au plus 82 % du côté de l'image (marges régulières). */
-const FILL_RATIO = 0.82;
+/** Le produit occupe au plus 76 % du côté de l'image : 12 % de marge blanche de chaque côté. */
+export const FILL_RATIO = 0.76;
 
 export function cutoutModelPath(): string {
   const dir = process.env.MODELS_DIR || path.join(process.cwd(), "storage", "models");
@@ -113,6 +113,73 @@ export function alphaBounds(alpha: Buffer, width: number, height: number) {
   return { left, top, width: right - left + 1, height: bottom - top + 1 };
 }
 
+/**
+ * Inclinaison à corriger (en degrés, sens horaire positif) d'un produit photographié un peu de travers.
+ * Axe principal de la silhouette (moments d'inertie du masque) comparé à l'horizontale / la verticale
+ * la plus proche. Volontairement prudent (réglé sur 30 vraies photos d'outillage) :
+ *  - seulement les objets nettement allongés (rapport ≥ 3 : marteau, tournevis, niveau…) — sur une
+ *    forme complexe (meuleuse, perceuse), l'axe principal ne dit pas où est le « droit » ;
+ *  - seulement entre 2° et 12° : au-delà, l'outil est presque toujours posé en diagonale exprès.
+ */
+export function straightenAngle(alpha: Buffer, width: number, height: number): number {
+  let n = 0;
+  let sx = 0;
+  let sy = 0;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (alpha[y * width + x]! > 128) {
+        n++;
+        sx += x;
+        sy += y;
+      }
+    }
+  }
+  if (n < 100) return 0;
+  const cx = sx / n;
+  const cy = sy / n;
+  let mu20 = 0;
+  let mu02 = 0;
+  let mu11 = 0;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (alpha[y * width + x]! > 128) {
+        const dx = x - cx;
+        const dy = y - cy;
+        mu20 += dx * dx;
+        mu02 += dy * dy;
+        mu11 += dx * dy;
+      }
+    }
+  }
+  // Allongement = rapport des écarts-types sur les deux axes principaux.
+  const common = Math.sqrt(4 * mu11 * mu11 + (mu20 - mu02) ** 2);
+  const major = (mu20 + mu02 + common) / 2;
+  const minor = Math.max((mu20 + mu02 - common) / 2, 1e-9);
+  if (Math.sqrt(major / minor) < 3) return 0;
+  const theta = (0.5 * Math.atan2(2 * mu11, mu20 - mu02) * 180) / Math.PI; // axe principal, y vers le bas
+  const residual = theta - Math.round(theta / 90) * 90;
+  if (Math.abs(residual) < 2 || Math.abs(residual) > 12) return 0;
+  return Math.round(residual * 10) / 10;
+}
+
+/**
+ * Part du produit détecté dont le contour est « incertain » (ni fond ni produit franc).
+ * Photo de produit : < 30 %. Affiche, visuel publicitaire, emballage à plat : souvent bien plus
+ * (le modèle hésite partout) → le détourage abîmerait l'image : on garde la photo d'origine.
+ */
+export const MAX_UNCERTAIN_RATIO = 0.35;
+export function uncertainRatio(alpha: Buffer): number {
+  let visible = 0;
+  let uncertain = 0;
+  for (const v of alpha) {
+    if (v > 16) {
+      visible++;
+      if (v < 230) uncertain++;
+    }
+  }
+  return visible ? uncertain / visible : 1;
+}
+
 /** Produit détouré : pixels d'origine + transparence, recadré au plus près. Jamais redimensionné. */
 export type CutoutProduct = { png: Buffer; width: number; height: number };
 
@@ -123,13 +190,31 @@ export async function cutoutProduct(original: Buffer): Promise<CutoutProduct> {
   const alpha = refineAlpha(await cutoutMask(rgb, width, height));
   const box = alphaBounds(alpha, width, height);
   if (!box) throw new AiError("no_subject");
+  if (uncertainRatio(alpha) > MAX_UNCERTAIN_RATIO) throw new AiError("no_subject", "détourage incertain");
   // Deux étapes : dans une même chaîne sharp, extract() serait appliqué AVANT joinChannel() (et ignoré).
   const rgba = await sharp(rgb, { raw: { width, height, channels: 3 } })
     .joinChannel(alpha, { raw: { width, height, channels: 1 } })
     .raw()
     .toBuffer();
-  const png = await sharp(rgba, { raw: { width, height, channels: 4 } }).extract(box).png().toBuffer();
-  return { png, width: box.width, height: box.height };
+  const tilt = straightenAngle(alpha, width, height);
+  if (tilt === 0) {
+    const png = await sharp(rgba, { raw: { width, height, channels: 4 } }).extract(box).png().toBuffer();
+    return { png, width: box.width, height: box.height };
+  }
+  // Produit penché : rotation inverse (fond transparent), puis nouveau recadrage au plus près.
+  // Seul cas où les pixels du produit sont rééchantillonnés.
+  const cropped = await sharp(rgba, { raw: { width, height, channels: 4 } }).extract(box).png().toBuffer();
+  const turned = await sharp(cropped)
+    .rotate(-tilt, { background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const { width: tw, height: th } = turned.info;
+  const turnedAlpha = Buffer.alloc(tw * th);
+  for (let i = 0; i < tw * th; i++) turnedAlpha[i] = turned.data[i * 4 + 3]!;
+  const tbox = alphaBounds(turnedAlpha, tw, th) ?? { left: 0, top: 0, width: tw, height: th };
+  const png = await sharp(turned.data, { raw: { width: tw, height: th, channels: 4 } }).extract(tbox).png().toBuffer();
+  return { png, width: tbox.width, height: tbox.height };
 }
 
 /** Ombre de contact floue (ellipse) sous la base du produit. */
@@ -144,9 +229,25 @@ function contactShadow(width: number, height: number, cx: number, baseY: number,
   );
 }
 
-/** Photo principale : produit à l'échelle 1:1 sur fond blanc pur, ombre douce. */
-export async function composeWhite(cut: CutoutProduct): Promise<Buffer> {
-  const side = Math.max(Math.ceil(Math.max(cut.width, cut.height) / FILL_RATIO), 400);
+/** Côté minimal de la photo studio : un produit minuscule sur la photo est agrandi jusque-là. */
+export const MIN_STUDIO_SIDE = 600;
+
+/**
+ * Photo principale : produit centré sur un carré blanc pur, 12 % de marge, ombre douce.
+ * Produit copié à l'échelle 1:1 ; seulement s'il est trop petit (< 76 % de 600 px), il est agrandi
+ * pour garder le même cadrage que les autres photos.
+ */
+export async function composeWhite(input: CutoutProduct): Promise<Buffer> {
+  const target = Math.round(MIN_STUDIO_SIDE * FILL_RATIO);
+  let cut = input;
+  if (Math.max(cut.width, cut.height) < target) {
+    const { data, info } = await sharp(cut.png)
+      .resize({ width: target, height: target, fit: "inside", kernel: "lanczos3" })
+      .png()
+      .toBuffer({ resolveWithObject: true });
+    cut = { png: data, width: info.width, height: info.height };
+  }
+  const side = Math.max(Math.ceil(Math.max(cut.width, cut.height) / FILL_RATIO), MIN_STUDIO_SIDE);
   const left = Math.round((side - cut.width) / 2);
   const top = Math.round((side - cut.height) / 2);
   return sharp({ create: { width: side, height: side, channels: 3, background: STUDIO_BACKGROUND } })

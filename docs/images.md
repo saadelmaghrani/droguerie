@@ -60,3 +60,23 @@ Remplacer une image crée une nouvelle clé et supprime les anciens fichiers.
 - `UPLOAD_DIR` doit pointer vers un **volume Docker** persistant et **sauvegardé** (avec la base).
 - Optimisation possible : Caddy sert directement `UPLOAD_DIR` sous `/media` (la route Next.js reste
   la référence fonctionnelle).
+
+## Photo « studio » automatique (photos produit)
+
+Toute photo produit ajoutée ou remplacée — admin (création, fiche), script `import:demo` — passe par
+`processProductPhoto` (`src/server/products/studio-photo.ts`) :
+
+1. **Détourage local** : modèle ISNet (`npm run ai:model`, ≈ 170 Mo, gratuit, sur le serveur, ~3 s/photo).
+   Le fond d'origine (établi, table, chantier, sol, logos/filigranes) est supprimé.
+2. **Redressement prudent** (`straightenAngle`) : seulement un objet nettement allongé (rapport ≥ 3) penché
+   de 2 à 12°. Une forme complexe ou un outil posé en diagonale exprès n'est pas tourné.
+3. **Cadrage** (`composeWhite`) : carré, fond blanc pur `#FFFFFF`, produit centré occupant 76 % du côté
+   (**12 % de marge**), ombre de contact douce ; canevas d'au moins 600 px (petit produit agrandi).
+4. **Enregistrement** : WebP 320 / 800 / 1600 (`source = AI_STUDIO`), photo d'origine conservée
+   (`original_storage_key`) → bouton « Revenir à la photo d'origine » dans l'admin.
+
+**Repli** (photo gardée telle quelle, message à l'admin) : modèle absent, aucun produit net, ou contour
+trop incertain (> 35 % : affiche publicitaire, visuel graphique, objet transparent) — `uncertainRatio`.
+
+Limite : pas de correction de **perspective** (photo prise en plongée) : un modèle 2D ne peut pas
+« redresser » un objet en 3D sans le redessiner, ce qui trahirait le produit.
