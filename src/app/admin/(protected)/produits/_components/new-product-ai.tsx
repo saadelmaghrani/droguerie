@@ -75,7 +75,7 @@ export function NewProductAi({
           else toast.warning("Proposition partielle : certaines parties n'ont pas pu être générées (détails ci-dessous).");
         } else setError(result.message);
       } catch {
-        setError("Le serveur ne répond pas. Vérifiez la connexion et réessayez.");
+        setError("Pas de réponse. Vérifiez votre connexion internet et réessayez, ou remplissez la fiche manuellement.");
       } finally {
         onGenerating(false);
       }
@@ -263,8 +263,8 @@ export function NewProductAi({
                   <p className="flex items-start gap-1.5 text-amber-800">
                     <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
                     <span>
-                      OpenAI n&apos;est pas configuré : seules les photos (fond blanc et montages) seront générées, pas le texte.{" "}
-                      <Link href="/admin/parametres#ia" className="underline">Paramètres</Link>
+                      La rédaction automatique n&apos;est pas disponible pour le moment : seules les photos (fond blanc et montages) seront
+                      préparées. Écrivez le nom et la description vous-même.
                     </span>
                   </p>
                 )}
@@ -310,7 +310,7 @@ function PartLine({ label, part }: { label: string; part: DraftPart<unknown> | u
         {part.accountAction && (
           <>
             {" "}
-            <Link href="/admin/parametres#ia" className="underline">État du compte OpenAI</Link>
+            <Link href="/admin/parametres#ia" className="underline">État de l&apos;assistant IA</Link>
           </>
         )}
       </span>

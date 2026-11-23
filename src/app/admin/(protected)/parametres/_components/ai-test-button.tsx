@@ -5,9 +5,9 @@ import { CircleAlert, CircleCheck, Loader2, PlugZap, TriangleAlert } from "lucid
 import { Button } from "@/components/ui/button";
 import { testAiConnectionAction } from "@/server/ai/actions";
 
-type Result = { ok: true; model: string; keyHint: string | null } | { ok: false; message: string; accountAction: boolean; keyHint: string | null };
+type Result = { ok: true } | { ok: false; message: string; accountAction: boolean };
 
-/** Vérifie la clé ET le crédit avec une toute petite requête (coût négligeable). */
+/** Vérifie que l'assistant répond (clé et crédit) avec une toute petite requête (coût négligeable). */
 export function AiTestButton() {
   const [result, setResult] = useState<Result | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -24,7 +24,7 @@ export function AiTestButton() {
               try {
                 setResult(await testAiConnectionAction());
               } catch {
-                setResult({ ok: false, message: "Le serveur ne répond pas. Réessayez.", accountAction: false, keyHint: null });
+                setResult({ ok: false, message: "Pas de réponse. Vérifiez votre connexion internet et réessayez.", accountAction: false });
               }
             })
           }
@@ -37,16 +37,13 @@ export function AiTestButton() {
         {result?.ok && (
           <p className="flex items-center gap-1.5 text-emerald-700">
             <CircleCheck className="size-4" aria-hidden />
-            Connexion réussie{result.keyHint ? ` avec la clé ${result.keyHint}` : ""} : la clé et le crédit OpenAI sont valides.
+            L&apos;assistant IA fonctionne correctement.
           </p>
         )}
         {result && !result.ok && (
           <p className={`flex items-start gap-1.5 break-words ${result.accountAction ? "text-amber-800" : "text-destructive"}`}>
             {result.accountAction ? <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden /> : <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />}
-            <span>
-              {result.message}
-              {result.keyHint && <span className="block text-xs opacity-80">Clé testée : {result.keyHint}</span>}
-            </span>
+            <span>{result.message}</span>
           </p>
         )}
       </div>

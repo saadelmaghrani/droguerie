@@ -20,7 +20,7 @@ import type { AiGenerationType } from "@/generated/prisma/client";
 import { isMultiPack } from "@/lib/multi-pack";
 import { DEFAULT_SCENE_BACKGROUND, type ExtraCount, type ExtraKind, type SceneBackground } from "@/lib/ai-costs";
 import { currentKeyHint } from "./client";
-import { ACCOUNT_ACTION_KINDS, AiError, classifyOpenAiError, KEY_ERROR_KINDS } from "./errors";
+import { ACCOUNT_ACTION_KINDS, AiError, classifyOpenAiError, KEY_ERROR_KINDS, logAiError } from "./errors";
 import { generateProductText } from "./product-text";
 import { estimateCostUsd, type ProductTextHints } from "./product-text-prompt";
 import { budgetError, ESTIMATED_COST_USD } from "./budget";
@@ -96,8 +96,9 @@ async function runPart<T>(
     return { ok: true, value: result.value };
   } catch (error) {
     const aiError = classifyOpenAiError(error);
+    // Détail technique : journal du serveur uniquement. L'admin ne voit que aiError.message (langage simple).
+    logAiError(`Brouillon ${ctx.draftId} (${type})`, aiError, KEY_ERROR_KINDS.includes(aiError.kind) ? currentKeyHint() : null);
     if (aiError.kind !== "not_configured") {
-      console.error(`[IA] Brouillon ${ctx.draftId} (${type}) : ${aiError.kind} ${aiError.detail ?? ""}`);
       await prisma.aiGeneration.create({
         data: {
           type,

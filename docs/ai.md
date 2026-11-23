@@ -70,8 +70,9 @@ faces jamais photographiées. Les montages et mises en scène gardent la face vi
   donne pas accès à l'API).
 - Paiement à l'utilisation (Billing) ; fixer un plafond mensuel (Billing › Limits).
 - Clé API dans le `.env` du serveur, puis redémarrer le site.
-- **Paramètres › Intelligence artificielle** : état de la clé, utilisations et coût estimé du mois,
-  dernier problème de compte, bouton **Tester la connexion**.
+- **Paramètres › Assistant IA** (vu par le commerçant) : activé / désactivé / indisponible, utilisations et
+  coût estimé du mois, dernière alerte en langage simple, bouton **Tester la connexion**. Le diagnostic
+  technique est dans le journal du serveur (voir « Erreurs »).
 
 ## Configuration (`.env`)
 
@@ -104,11 +105,11 @@ Règle du projet : **la clé est uniquement dans `.env`** (aucun `.env.local`, a
 - au démarrage du serveur (`src/instrumentation.ts`, si `AI_ENABLED=true`), une ligne `[IA] Clé OpenAI : …`
   dans le journal : format, fichier de provenance, conflit éventuel ;
 - avant chaque appel : une clé mal formatée n'est PAS envoyée à OpenAI (erreur `malformed_key`) ;
-- Paramètres › Intelligence artificielle : format, indice `sk-…abcd` (4 derniers caractères, comme sur le
-  tableau de bord OpenAI), provenance, alerte si un autre fichier contient une autre valeur, alerte si une
-  variable `NEXT_PUBLIC_*` contient une clé, procédure de changement, « Tester la connexion » (avec la clé testée) ;
-- les échecs liés à la clé enregistrent son indice : si la clé a été changée depuis, l'alerte le dit au lieu
-  d'afficher une erreur périmée.
+- chaque échec : `logAiError()` écrit le type, la consigne technique et l'indice `sk-…abcd` de la clé utilisée ;
+- Paramètres › Assistant IA (commerçant) : seulement « activé / désactivé / indisponible », la consommation,
+  la dernière alerte en langage simple et « Tester la connexion » — aucun détail technique ;
+- les échecs liés à la clé enregistrent son indice : si la clé a été changée depuis, l'ancienne alerte n'est
+  plus affichée.
 
 **Recharger après modification du `.env` :**
 - en local (`npm run dev`) : rechargé automatiquement à l'enregistrement (Next.js surveille les fichiers `.env*`) ;
@@ -125,21 +126,29 @@ Règle du projet : **la clé est uniquement dans `.env`** (aucun `.env.local`, a
 
 ## Erreurs
 
-| Cas | Code OpenAI | Message à l'admin |
-|---|---|---|
-| Clé absente | — | « L'IA n'est pas configurée… » |
-| Clé mal formatée (guillemet, espace, exemple, coupée, sans `sk-`) | — (rien n'est envoyé) | « La clé OPENAI_API_KEY du .env est mal formatée… » + détail précis dans Paramètres |
-| Clé fausse / supprimée / révoquée | 401 | « Clé API OpenAI refusée par OpenAI… créez une nouvelle clé » |
-| Clé expirée | 401 `expired_secret_key` | « Clé API OpenAI expirée. Créez une nouvelle clé… » |
-| Crédit épuisé | 429 `insufficient_quota`, `credit_balance_exhausted` | « Crédit OpenAI épuisé : rechargez le compte… » |
-| Plafond atteint | 429 `*_spend_limit_exceeded`, `*_usage_limit_exceeded` | « Plafond de dépenses atteint… » |
-| Trop de demandes | 429 autres | « Patientez une minute » |
-| Modèle inconnu | 404 / `model_not_found` | « Vérifiez OPENAI_MODEL » |
-| OpenAI en panne | 5xx | « Momentanément indisponible » |
-| Pas d'internet | connexion | « Impossible de joindre OpenAI » |
-| Détourage non installé | — | « Lancez npm run ai:model » |
-| Aucun produit net sur la photo | — | « Aucun produit net n'a été détecté… » |
-| Plafond du site atteint | — | « Plafond mensuel des dépenses IA du site atteint… » |
+**Deux niveaux de messages** (`src/server/ai/errors.ts`) :
+- `AI_MESSAGES` — affichés dans l'admin, en langage commerçant : jamais de nom de fichier, de variable, de
+  code HTTP ni de commande ; toujours une issue (« remplissez la fiche manuellement »). Garanti par un test.
+- `TECH_HINTS` — consigne technique pour le prestataire, écrite **uniquement dans le journal du serveur** par
+  `logAiError()` (type d'erreur, consigne, détail OpenAI, indice de clé `sk-…abcd`).
+
+| Cas | Code OpenAI | Affiché à l'admin | Journal serveur (extrait) |
+|---|---|---|---|
+| Clé absente / mal formatée / refusée / expirée, accès refusé, modèle inconnu, détourage non installé | — / 401 / 403 / 404 | « L'assistant IA n'est pas disponible pour le moment. Vous pouvez remplir la fiche manuellement. Si cela dure, contactez votre prestataire. » | `expired_key — HTTP 401 expired_secret_key : nouvelle clé…, remplacer OPENAI_API_KEY dans le .env…` |
+| Crédit épuisé | 429 `insufficient_quota` | « Le crédit de l'assistant IA est épuisé… » | `billing — HTTP 429 insufficient_quota…` |
+| Plafond OpenAI / plafond du site | 429 `*_limit_exceeded` / — | « La limite de dépenses… » / « Le plafond mensuel… » | `spend_limit` / `budget — AI_MONTHLY_BUDGET_USD…` |
+| Trop de demandes | 429 autres | « L'assistant IA est très sollicité… » | `rate_limit` |
+| OpenAI en panne / injoignable | 5xx / connexion | « Service IA temporairement indisponible / injoignable… » | `unavailable` / `network` |
+| Réponse inutilisable | — | « L'IA n'a pas pu proposer de résultat cette fois-ci… » | `bad_response` + détail |
+| Aucun produit net sur la photo | — | « Aucun produit net n'a été détecté… » | `no_subject` |
+
+Où lire le diagnostic : terminal de `npm run dev` en local ; `docker compose logs app` (ou équivalent) en production.
+Lignes à chercher : `[IA] Clé OpenAI : …` (au démarrage) et `[IA] Brouillon …` / `[IA] Test de connexion : …`.
+
+**IA désactivée ou en panne : rien n'est bloqué.** Avec `AI_ENABLED` différent de `true`, la carte « Générer
+avec l'IA » est masquée et l'encadré des Paramètres indique « Assistant IA désactivé ». En cas d'échec, la partie
+concernée est marquée « non générée » et la fiche se remplit à la main ; photos, création, modification,
+remplacement, suppression et photo principale fonctionnent normalement (vérifié de bout en bout dans les deux cas).
 
 ## Code
 

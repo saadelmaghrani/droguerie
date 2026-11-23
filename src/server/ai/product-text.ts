@@ -5,7 +5,7 @@ import "server-only";
 
 import { prisma } from "@/lib/prisma";
 import { aiModel, currentKeyHint, openai } from "./client";
-import { ACCOUNT_ACTION_KINDS, AiError, classifyOpenAiError } from "./errors";
+import { ACCOUNT_ACTION_KINDS, AiError, classifyOpenAiError, logAiError } from "./errors";
 import {
   buildProductTextPrompt,
   PRODUCT_TEXT_INSTRUCTIONS,
@@ -46,17 +46,18 @@ export async function generateProductText(
 
 /** Appel minimal pour vérifier la clé ET le crédit (une requête de quelques jetons, coût négligeable). */
 export async function testAiConnection(): Promise<
-  { ok: true; model: string; keyHint: string | null } | { ok: false; kind: AiError["kind"]; message: string; accountAction: boolean; keyHint: string | null }
+  { ok: true } | { ok: false; kind: AiError["kind"]; message: string; accountAction: boolean }
 > {
   const model = aiModel();
   const keyHint = currentKeyHint();
   try {
     await openai().responses.create({ model, input: "Réponds OK.", max_output_tokens: 16, store: false });
-    return { ok: true, model, keyHint };
+    console.info(`[IA] Test de connexion réussi (modèle ${model}, clé ${keyHint})`);
+    return { ok: true };
   } catch (error) {
     const aiError = classifyOpenAiError(error);
-    if (aiError.kind !== "not_configured") console.error(`[IA] Test de connexion : ${aiError.kind} ${aiError.detail ?? ""}`);
-    return { ok: false, kind: aiError.kind, message: aiError.message, accountAction: ACCOUNT_ACTION_KINDS.includes(aiError.kind), keyHint };
+    logAiError("Test de connexion", aiError, keyHint);
+    return { ok: false, kind: aiError.kind, message: aiError.message, accountAction: ACCOUNT_ACTION_KINDS.includes(aiError.kind) };
   }
 }
 

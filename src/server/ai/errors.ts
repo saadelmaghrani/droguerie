@@ -20,28 +20,59 @@ export type AiErrorKind =
   | "no_subject" // aucun produit net détecté sur la photo
   | "budget"; // plafond mensuel du site atteint (AI_MONTHLY_BUDGET_USD)
 
-const BILLING_URL = "https://platform.openai.com/settings/organization/billing";
-const KEYS_URL = "https://platform.openai.com/api-keys";
-const LIMITS_URL = "https://platform.openai.com/settings/organization/limits";
+const MANUAL = "Vous pouvez remplir la fiche manuellement.";
+const UNAVAILABLE = `L'assistant IA n'est pas disponible pour le moment. ${MANUAL} Si cela dure, contactez votre prestataire.`;
 
+/**
+ * Messages AFFICHÉS dans l'admin : langage simple pour le commerçant, toujours une solution manuelle.
+ * Aucun détail technique (fichier de configuration, nom de variable, code HTTP, commande) :
+ * ceux-ci sont dans TECH_HINTS, écrits uniquement dans le journal du serveur (logAiError).
+ */
 export const AI_MESSAGES: Record<AiErrorKind, string> = {
-  not_configured: "L'IA n'est pas configurée : ajoutez la clé OPENAI_API_KEY dans le fichier .env du serveur, puis redémarrez le site.",
-  malformed_key:
-    "La clé OPENAI_API_KEY du .env est mal formatée (guillemets, espaces, texte d'exemple ou clé coupée) : elle n'a pas été envoyée à OpenAI. Le détail est dans Paramètres › Intelligence artificielle.",
-  invalid_key: `Clé API OpenAI refusée par OpenAI (fausse, supprimée ou révoquée). Créez une nouvelle clé sur ${KEYS_URL}, remplacez OPENAI_API_KEY dans le .env du serveur, puis redémarrez le site.`,
-  expired_key: `Clé API OpenAI expirée. Créez une nouvelle clé sur ${KEYS_URL}, remplacez OPENAI_API_KEY dans le .env du serveur, puis redémarrez le site.`,
-  forbidden: "OpenAI refuse l'accès (pays non pris en charge ou droits insuffisants de la clé). Vérifiez les permissions de la clé sur platform.openai.com.",
-  billing: `Crédit OpenAI épuisé : rechargez le compte sur ${BILLING_URL}. L'IA refonctionnera quelques minutes après le paiement.`,
-  spend_limit: `Plafond de dépenses OpenAI atteint : augmentez la limite sur ${LIMITS_URL}, ou attendez le mois prochain.`,
-  rate_limit: "Trop de demandes envoyées à OpenAI en peu de temps. Patientez une minute puis réessayez.",
-  model: "Le modèle d'IA configuré (OPENAI_MODEL) n'existe pas ou n'est pas accessible avec cette clé. Vérifiez sa valeur dans le .env.",
-  unavailable: "OpenAI est momentanément indisponible. Réessayez dans quelques minutes.",
-  network: "Impossible de joindre OpenAI : vérifiez la connexion internet du serveur, puis réessayez.",
-  bad_response: "La réponse de l'IA est inutilisable. Réessayez ; si cela persiste, ajoutez une photo plus nette ou plus d'informations.",
-  cutout_unavailable: "Le détourage n'est pas installé sur le serveur : lancez « npm run ai:model » (téléchargement unique d'environ 170 Mo).",
-  budget: "Plafond mensuel des dépenses IA du site atteint. Augmentez AI_MONTHLY_BUDGET_USD dans le .env (puis redémarrez le site), ou attendez le mois prochain.",
+  not_configured: UNAVAILABLE,
+  malformed_key: UNAVAILABLE,
+  invalid_key: UNAVAILABLE,
+  expired_key: UNAVAILABLE,
+  forbidden: UNAVAILABLE,
+  model: UNAVAILABLE,
+  cutout_unavailable: UNAVAILABLE,
+  billing: `Le crédit de l'assistant IA est épuisé. ${MANUAL} L'IA refonctionnera après la recharge du compte (contactez votre prestataire si besoin).`,
+  spend_limit: `La limite de dépenses de l'assistant IA est atteinte. ${MANUAL} L'IA refonctionnera le mois prochain ou après relèvement de la limite.`,
+  budget: `Le plafond mensuel de l'assistant IA est atteint. ${MANUAL} L'IA sera de nouveau disponible le mois prochain.`,
+  rate_limit: `L'assistant IA est très sollicité. Patientez une minute puis réessayez, ou remplissez la fiche manuellement.`,
+  unavailable: `Service IA temporairement indisponible. Veuillez réessayer dans quelques minutes ou remplir la fiche manuellement.`,
+  network: `Service IA temporairement injoignable. Veuillez réessayer dans quelques minutes ou remplir la fiche manuellement.`,
+  bad_response: `L'IA n'a pas pu proposer de résultat cette fois-ci. Réessayez, ou remplissez la fiche manuellement.`,
   no_subject: "Aucun produit net n'a été détecté sur la photo principale. Essayez avec une photo où le produit est bien visible et centré.",
 };
+
+const KEYS_URL = "https://platform.openai.com/api-keys";
+const RESTART = "puis recharger la config (npm run dev : automatique ; production : redémarrer le site)";
+
+/** Consigne technique pour le développeur / prestataire — JOURNAL SERVEUR UNIQUEMENT, jamais affichée. */
+export const TECH_HINTS: Record<AiErrorKind, string> = {
+  not_configured: `OPENAI_API_KEY absente : l'ajouter dans le .env du serveur, ${RESTART}`,
+  malformed_key: `OPENAI_API_KEY mal formatée (guillemets, espaces, exemple, coupée) — non envoyée à OpenAI : la corriger dans le .env, ${RESTART}`,
+  invalid_key: `HTTP 401 clé refusée (fausse/supprimée/révoquée) : nouvelle clé sur ${KEYS_URL}, remplacer OPENAI_API_KEY dans le .env, ${RESTART}`,
+  expired_key: `HTTP 401 expired_secret_key : nouvelle clé sur ${KEYS_URL}, remplacer OPENAI_API_KEY dans le .env, ${RESTART}`,
+  forbidden: "HTTP 403 : pays non pris en charge ou permissions insuffisantes de la clé (platform.openai.com)",
+  billing: "HTTP 429 insufficient_quota : recharger le crédit (platform.openai.com › Billing)",
+  spend_limit: "HTTP 429 *_spend_limit_exceeded : relever la limite (platform.openai.com › Limits)",
+  rate_limit: "HTTP 429 rate limit : trop de requêtes, réessayer",
+  model: "OPENAI_MODEL / OPENAI_IMAGE_MODEL inconnu ou non autorisé pour cette clé : vérifier le .env",
+  unavailable: "HTTP 5xx : panne OpenAI (status.openai.com)",
+  network: "Connexion à l'API OpenAI impossible depuis le serveur (DNS, pare-feu, internet)",
+  bad_response: "Réponse OpenAI inutilisable (refus, coupée, JSON invalide) ou traitement d'image échoué",
+  cutout_unavailable: "Modèle de détourage absent : lancer « npm run ai:model » sur le serveur (MODELS_DIR)",
+  budget: "Plafond du site atteint : AI_MONTHLY_BUDGET_USD dans le .env",
+  no_subject: "Détourage : aucun sujet net détecté",
+};
+
+/** Écrit l'erreur complète (type, consigne, détail OpenAI, indice de clé) dans le journal du serveur. */
+export function logAiError(context: string, error: AiError, keyHint?: string | null): void {
+  const parts = [`[IA] ${context} : ${error.kind}`, TECH_HINTS[error.kind], error.detail, keyHint ? `clé ${keyHint}` : null];
+  console.error(parts.filter(Boolean).join(" — "));
+}
 
 /** L'administrateur doit agir sur son compte OpenAI (bandeau d'alerte, pas une simple erreur passagère). */
 /** Erreurs liées à la clé elle-même (à corriger dans le .env). */

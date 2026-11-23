@@ -24,7 +24,10 @@ const draftOptionsSchema = z.object({
 /** Un seul clic : fond blanc + 2 montages locaux + nom/description (+ 2 mises en scène IA si demandées). Rien n'est enregistré sur un produit. */
 export async function generateProductDraftAction(formData: FormData): Promise<DraftResult> {
   const admin = await requireAdmin();
-  if (!isAiFeatureEnabled()) return { ok: false, message: "L'IA est en pause (AI_ENABLED n'est pas activé dans le .env)." };
+  if (!isAiFeatureEnabled()) {
+    console.warn("[IA] Génération demandée alors que AI_ENABLED n'est pas à true dans le .env (assistant masqué).");
+    return { ok: false, message: "L'assistant IA est désactivé. Vous pouvez remplir la fiche manuellement." };
+  }
   if (!(formData instanceof FormData)) return { ok: false, message: "Requête invalide." };
   const upload = readUploadedFile(formData.get("file"));
   if (!upload.ok) return { ok: false, message: upload.error };

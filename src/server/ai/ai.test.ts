@@ -1,6 +1,6 @@
 import { APIConnectionError, APIError } from "openai";
 import { describe, expect, it } from "vitest";
-import { AiError, classifyOpenAiError, kindFromErrorFields } from "./errors";
+import { AI_MESSAGES, AiError, classifyOpenAiError, kindFromErrorFields, TECH_HINTS } from "./errors";
 import { buildProductTextPrompt, cleanNotes, estimateCostUsd, NOTES_MAX_LENGTH, parseProductTextOutput } from "./product-text-prompt";
 
 const apiError = (status: number, code?: string, type?: string) =>
@@ -33,10 +33,21 @@ describe("classification des erreurs OpenAI", () => {
   it("erreur inconnue → bad_response, message en français", () => {
     const e = classifyOpenAiError(new Error("boom"));
     expect(e.kind).toBe("bad_response");
-    expect(e.message).toMatch(/inutilisable/);
+    expect(e.message).toMatch(/n.a pas pu proposer de résultat/);
   });
-  it("crédit épuisé : le message dit de recharger le compte", () => {
-    expect(new AiError("billing").message).toMatch(/rechargez le compte/);
+  it("crédit épuisé : le message parle de recharge et propose la saisie manuelle", () => {
+    expect(new AiError("billing").message).toMatch(/recharge du compte/);
+    expect(new AiError("billing").message).toMatch(/manuellement/);
+  });
+  it("messages affichés à l'admin : aucun détail technique, toujours une solution", () => {
+    for (const [kind, message] of Object.entries(AI_MESSAGES)) {
+      expect(message, kind).not.toMatch(/\.env|OPENAI|AI_|npm|HTTP|\b[45]\d\d\b|serveur|clé API|api-keys|MODEL/i);
+      if (kind !== "no_subject") expect(message, kind).toMatch(/manuellement|à la main/);
+    }
+  });
+  it("la consigne technique reste disponible pour le journal du serveur", () => {
+    expect(TECH_HINTS.expired_key).toMatch(/OPENAI_API_KEY/);
+    expect(TECH_HINTS.cutout_unavailable).toMatch(/npm run ai:model/);
   });
 });
 

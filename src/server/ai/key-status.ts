@@ -1,5 +1,5 @@
-// État de la clé OpenAI pour l'admin (Paramètres › Intelligence artificielle) et le journal de démarrage :
-// format, provenance (quel fichier .env ou variable système), conflits, et comment recharger la config.
+// Diagnostic technique de la clé OpenAI pour le JOURNAL DU SERVEUR (démarrage) : format, provenance
+// (quel fichier .env ou variable système), conflits. Jamais affiché dans l'admin (langage commerçant).
 // Côté SERVEUR uniquement. Ne renvoie JAMAIS la clé : seulement l'indice « sk-…abcd ».
 import "server-only";
 
@@ -40,13 +40,6 @@ export async function getApiKeyStatus(): Promise<ApiKeyStatus> {
     publicLeaks: Object.keys(process.env).filter((k) => k.startsWith("NEXT_PUBLIC_") && /^\s*["']?sk-/.test(process.env[k] ?? "")),
     environment: process.env.NODE_ENV === "production" ? "production" : "development",
   };
-}
-
-/** Comment faire prendre en compte une modification du .env, selon l'environnement. */
-export function reloadInstructions(environment: ApiKeyStatus["environment"]): string {
-  return environment === "development"
-    ? "En local (npm run dev), une modification du fichier .env est rechargée automatiquement dès l'enregistrement ; en cas de doute, arrêtez (Ctrl+C) puis relancez npm run dev."
-    : "En production, le .env n'est lu qu'au démarrage : après l'avoir modifié, redémarrez le site (ex. docker compose restart). Le .env du serveur est distinct de celui de votre ordinateur.";
 }
 
 /** Une ligne pour le journal du serveur (aucun secret). */
