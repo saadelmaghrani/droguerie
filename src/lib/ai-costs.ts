@@ -10,6 +10,9 @@ export const TYPICAL_COST_USD = {
 } as const;
 
 export type ExtraKind = "montage" | "ai";
+/** Fond des photos « Générées par l'IA » : blanc pur par défaut ; mise en scène seulement si choisie. */
+export type SceneBackground = "white" | "scene";
+export const DEFAULT_SCENE_BACKGROUND: SceneBackground = "white";
 export const EXTRA_COUNTS = [0, 1, 2] as const;
 export type ExtraCount = (typeof EXTRA_COUNTS)[number];
 

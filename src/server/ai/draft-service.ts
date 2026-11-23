@@ -17,7 +17,7 @@ import { prisma } from "@/lib/prisma";
 import { deleteImageFiles, processImage, type ProcessedImage } from "@/server/media/images";
 import { localStorage } from "@/server/media/storage";
 import type { AiGenerationType } from "@/generated/prisma/client";
-import type { ExtraCount, ExtraKind } from "@/lib/ai-costs";
+import { DEFAULT_SCENE_BACKGROUND, type ExtraCount, type ExtraKind, type SceneBackground } from "@/lib/ai-costs";
 import { ACCOUNT_ACTION_KINDS, AiError, classifyOpenAiError } from "./errors";
 import { generateProductText } from "./product-text";
 import { estimateCostUsd, type ProductTextHints } from "./product-text-prompt";
@@ -119,7 +119,7 @@ export async function createProductDraft(
   hints: ProductTextHints,
   adminUserId: string,
   /** extraCount : 0 à 2 photos supplémentaires ; extraKind : montages locaux (gratuits) ou mises en scène IA. */
-  options: { extraCount: ExtraCount; extraKind: ExtraKind },
+  options: { extraCount: ExtraCount; extraKind: ExtraKind; sceneBackground?: SceneBackground },
 ): Promise<DraftResult> {
   await cleanupStaleDrafts();
   const draftId = crypto.randomUUID();
@@ -159,12 +159,13 @@ export async function createProductDraft(
       return { value: image, output: { ...image, role: "extra", slot }, model: "isnet-general-use", costUsd: 0 };
     }).then((part): DraftExtra => ({ slot, kind: "montage", label: MONTAGE_LABELS[style], part })),
   );
+  const background = options.sceneBackground ?? DEFAULT_SCENE_BACKGROUND;
   const aiScenes = aiSceneCount > 0
     ? ([0, 1] as const).slice(0, aiSceneCount).map((index) => {
         const slot: ExtraSlot = index === 0 ? "ai-0" : "ai-1";
         return runPart<DraftImage>(ctx, "IMAGE_SCENE", "openai", "", async () => {
           guard();
-          const result = await sceneFromOpenAi(full, index);
+          const result = await sceneFromOpenAi(full, index, background);
           const image = toDraftImage(await storePng(result.png, draftId, `${slot}.png`));
           return {
             value: image,
@@ -174,7 +175,7 @@ export async function createProductDraft(
             outputTokens: result.outputTokens,
             costUsd: estimateImageCostUsd(result.model, result.inputTokens, result.outputTokens),
           };
-        }).then((part): DraftExtra => ({ slot, kind: "ai", label: `Mise en scène IA ${index + 1}`, part }));
+        }).then((part): DraftExtra => ({ slot, kind: "ai", label: `${background === "white" ? "Fond blanc IA" : "Mise en scène IA"} ${index + 1}`, part }));
       })
     : [];
   const text = runPart<DraftText>(ctx, "TEXT", "openai", "", async () => {

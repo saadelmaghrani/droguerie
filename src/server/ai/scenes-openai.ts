@@ -1,4 +1,5 @@
-// Photos SUPPLÉMENTAIRES par OpenAI (images.edit) : 2 mises en scène de la photo envoyée.
+// Photos SUPPLÉMENTAIRES par OpenAI (images.edit), « Générées par l'IA ». Par défaut sur FOND BLANC PUR
+// (#FFFFFF, produit centré et net) ; décor (table, studio dégradé) seulement si l'admin le choisit.
 // ATTENTION : le modèle REDESSINE l'image. Pour limiter l'invention, on ne demande PAS d'autres angles
 // (l'IA devrait alors imaginer les faces cachées) : seulement la MÊME face visible, dans un autre décor.
 // L'interface les présente comme « générées par l'IA », décochées par défaut.
@@ -6,8 +7,10 @@ import "server-only";
 
 import { toFile } from "openai";
 import sharp from "sharp";
+import type { SceneBackground } from "@/lib/ai-costs";
 import { openai } from "./client";
 import { AiError } from "./errors";
+import { composeWhite, cutoutProduct } from "./studio-cutout";
 
 export const DEFAULT_OPENAI_IMAGE_MODEL = "gpt-image-2.5-sunburst";
 
@@ -22,7 +25,27 @@ const STRICT_RULES = `STRICT RULES — the product must remain exactly as in the
 - If something on the product is blurry or unreadable, leave it as it is; never invent it.
 - The whole product stays visible and uncropped. No text overlay, no watermark.`;
 
-/** Deux mises en scène sobres, adaptées à un catalogue de droguerie. */
+/**
+ * PAR DÉFAUT : photo « packshot » sur blanc pur, comme la photo principale. Deux variantes d'éclairage,
+ * même cadrage. Aucun décor (atelier, table, sol), aucun fond coloré ou dégradé.
+ */
+const WHITE_BACKGROUND = `BACKGROUND: pure white #FFFFFF everywhere around the product — seamless, flat and uniform.
+No workshop, no table or floor surface, no horizon line, no wall, no props, no gradient, no vignette, no coloured or grey backdrop,
+no reflection. Only a very soft, light contact shadow directly under the product is allowed.
+FRAMING: product perfectly centered, fully visible and uncropped, filling about three quarters of the frame with even white margins
+on all sides. Product in sharp focus, crisp edges, true-to-life colours.`;
+
+export const WHITE_PROMPTS = [
+  `Professional e-commerce packshot of this product. Bright, even, shadowless studio lighting from the front.
+${WHITE_BACKGROUND}
+${STRICT_RULES}`,
+  `Professional e-commerce packshot of this product. Soft diffused studio lighting from above and both sides that brings out its
+shape, materials and the legibility of its printed labels.
+${WHITE_BACKGROUND}
+${STRICT_RULES}`,
+] as const;
+
+/** Seulement si l'admin choisit « Mise en scène » : deux décors sobres pour un catalogue de droguerie. */
 export const SCENE_PROMPTS = [
   `Catalogue photo of this product placed on a clean light wooden tabletop, against a softly blurred, bright neutral background
 (well-lit shop or workshop ambience). Natural soft daylight, realistic shadow, product centered and in sharp focus.
@@ -31,6 +54,36 @@ ${STRICT_RULES}`,
 reflection and gentle rim lighting. Product centered, slightly larger in frame, in sharp focus.
 ${STRICT_RULES}`,
 ] as const;
+
+export function scenePrompt(index: 0 | 1, background: SceneBackground): string {
+  return (background === "scene" ? SCENE_PROMPTS : WHITE_PROMPTS)[index];
+}
+
+/**
+ * Garantie après génération (fond blanc) : l'IA rend souvent un « presque blanc » (#FAFAFA, voile gris).
+ * L'image produite est détourée localement puis recadrée exactement comme la photo principale :
+ * blanc #FFFFFF, produit centré, 12 % de marge. Si le détourage échoue : fond quasi blanc forcé à #FFFFFF.
+ */
+export async function enforceWhiteBackground(png: Buffer): Promise<Buffer> {
+  try {
+    return await composeWhite(await cutoutProduct(png));
+  } catch {
+    return whitenNearWhite(png);
+  }
+}
+
+/** Pixels quasi blancs (les 3 canaux ≥ 240) → blanc pur ; le reste est inchangé. */
+export async function whitenNearWhite(png: Buffer, threshold = 240): Promise<Buffer> {
+  const { data, info } = await sharp(png).flatten({ background: "#ffffff" }).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  for (let i = 0; i < data.length; i += 3) {
+    if (data[i]! >= threshold && data[i + 1]! >= threshold && data[i + 2]! >= threshold) {
+      data[i] = 255;
+      data[i + 1] = 255;
+      data[i + 2] = 255;
+    }
+  }
+  return sharp(data, { raw: { width: info.width, height: info.height, channels: 3 } }).png().toBuffer();
+}
 
 /** Prix publics (dollars / million de jetons) : [entrée, sortie]. Indicatif. */
 const IMAGE_PRICES: Record<string, [number, number]> = {
@@ -49,6 +102,7 @@ export function estimateImageCostUsd(model: string, inputTokens: number, outputT
 export async function sceneFromOpenAi(
   original: Buffer,
   index: 0 | 1,
+  background: SceneBackground = "white",
 ): Promise<{ png: Buffer; model: string; inputTokens: number; outputTokens: number }> {
   const model = aiImageModel();
   const client = openai(); // lève not_configured si la clé est absente
@@ -57,7 +111,7 @@ export async function sceneFromOpenAi(
     {
       model,
       image: await toFile(input, "produit.png", { type: "image/png" }),
-      prompt: SCENE_PROMPTS[index],
+      prompt: scenePrompt(index, background),
       size: "1024x1024",
       quality: "medium", // ≈ 4 fois moins cher que « high », suffisant pour une vignette catalogue
       background: "opaque",
@@ -67,8 +121,9 @@ export async function sceneFromOpenAi(
   );
   const b64 = response.data?.[0]?.b64_json;
   if (!b64) throw new AiError("bad_response", "aucune image renvoyée");
+  const generated = Buffer.from(b64, "base64");
   return {
-    png: Buffer.from(b64, "base64"),
+    png: background === "white" ? await enforceWhiteBackground(generated) : generated,
     model,
     inputTokens: response.usage?.input_tokens ?? 0,
     outputTokens: response.usage?.output_tokens ?? 0,

@@ -18,6 +18,7 @@ const uuid = z.uuid();
 const draftOptionsSchema = z.object({
   extraCount: z.union([z.literal(0), z.literal(1), z.literal(2)]),
   extraKind: z.enum(["montage", "ai"]),
+  sceneBackground: z.enum(["white", "scene"]),
 });
 
 /** Un seul clic : fond blanc + 2 montages locaux + nom/description (+ 2 mises en scène IA si demandées). Rien n'est enregistré sur un produit. */
@@ -35,6 +36,8 @@ export async function generateProductDraftAction(formData: FormData): Promise<Dr
   const options = draftOptionsSchema.safeParse({
     extraCount: Number(formData.get("extraCount") ?? 2),
     extraKind: formData.get("extraKind") ?? "montage",
+    // Fond blanc pur sauf choix explicite « Mise en scène ».
+    sceneBackground: formData.get("sceneBackground") === "scene" ? "scene" : "white",
   });
   if (!options.success) return { ok: false, message: "Choix de photos invalide." };
   const notes = cleanNotes(String(formData.get("notes") ?? ""));

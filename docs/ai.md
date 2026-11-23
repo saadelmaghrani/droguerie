@@ -15,7 +15,7 @@ L'IA n'est proposée **qu'à l'ajout d'un produit** (`/admin/produits/nouveau`),
    - **Notes pour l'IA** (facultatif, 500 caractères) : matière, marque, taille, usage, argument clé… Elles sont
      ajoutées à la consigne du texte, entre délimiteurs, comme **faits fiables à utiliser en priorité** ; l'IA a
      pour consigne de les traiter comme des informations, jamais comme des ordres (pas de prix, etc.).
-   - **Coût estimé** affiché en direct (`src/lib/ai-costs.ts`, testé) : ≈ 0,001 $ (texte) + ≈ 0,05 $ par mise en scène IA.
+   - **Coût estimé** affiché en direct (`src/lib/ai-costs.ts`, testé) : ≈ 0,001 $ (texte) + ≈ 0,05 $ par photo générée par l'IA.
 2. Le serveur enregistre la photo, la **détoure une seule fois**, puis prépare en parallèle :
 
 | Résultat | Technique | Fidélité | Coût |
@@ -127,3 +127,15 @@ Modèle de détourage : `npm run ai:model` une fois par machine **et sur le serv
 | `src/app/admin/(protected)/produits/_components/new-product-ai.tsx` | Carte « Générer avec l'IA » |
 | `src/app/admin/(protected)/produits/_components/draft-photos.tsx` | Aperçu et choix des photos |
 | `src/app/admin/(protected)/parametres/_components/ai-*.tsx` | Encadré des Paramètres |
+
+## Photos « Générées par l'IA » : fond blanc pur par défaut
+
+- **Par défaut** (`sceneBackground = "white"`) : consignes `WHITE_PROMPTS` (`src/server/ai/scenes-openai.ts`) —
+  packshot e-commerce sur blanc pur `#FFFFFF`, produit centré, entier et net ; interdits : atelier, table, sol,
+  mur, accessoires, dégradé, fond coloré/gris, reflet. Les règles strictes de fidélité au produit restent.
+- **Garantie** (`enforceWhiteBackground`) : l'image renvoyée par OpenAI est détourée localement puis recadrée
+  comme la photo principale (`composeWhite` : #FFFFFF, centré, 12 % de marge). Repli si détourage impossible :
+  pixels quasi blancs (≥ 240) forcés à #FFFFFF (`whitenNearWhite`).
+- **Indication contraire** : choix « Fond des photos IA → Mise en scène (table, studio) » dans la carte
+  « Générer avec l'IA » (`sceneBackground = "scene"`) : anciennes consignes `SCENE_PROMPTS`, image non retouchée.
+- Libellés : « Fond blanc IA n » / « Mise en scène IA n ». Les montages locaux (gratuits) sont inchangés.

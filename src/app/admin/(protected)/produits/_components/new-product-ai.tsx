@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { EXTRA_COUNTS, estimateGenerationUsd, formatUsd, TYPICAL_COST_USD, type ExtraCount, type ExtraKind } from "@/lib/ai-costs";
+import { DEFAULT_SCENE_BACKGROUND, EXTRA_COUNTS, estimateGenerationUsd, formatUsd, TYPICAL_COST_USD, type ExtraCount, type ExtraKind, type SceneBackground } from "@/lib/ai-costs";
 import { discardProductDraftAction, generateProductDraftAction } from "@/server/ai/actions";
 import { NOTES_MAX_LENGTH as NOTES_MAX } from "@/server/ai/product-text-prompt";
 import type { DraftPart, DraftResult } from "@/server/ai/draft-service";
@@ -44,6 +44,7 @@ export function NewProductAi({
   // Photos supplémentaires : 2 montages gratuits par défaut ; les mises en scène IA (payantes) sont un choix explicite.
   const [extraCount, setExtraCount] = useState<ExtraCount>(2);
   const [extraKind, setExtraKind] = useState<ExtraKind>("montage");
+  const [sceneBackground, setSceneBackground] = useState<SceneBackground>(DEFAULT_SCENE_BACKGROUND);
   const [notes, setNotes] = useState("");
   const aiScenes = extraKind === "ai" && extraCount > 0;
   const cost = estimateGenerationUsd({ extraCount, extraKind, openAiConfigured: configured });
@@ -62,6 +63,7 @@ export function NewProductAi({
     data.set("categoryId", hints.categoryId);
     data.set("extraCount", String(extraCount));
     data.set("extraKind", extraKind);
+    data.set("sceneBackground", sceneBackground);
     data.set("notes", notes);
     startTransition(async () => {
       try {
@@ -120,7 +122,7 @@ export function NewProductAi({
             <ul className="grid gap-1.5 text-sm">
               {[
                 STEPS[0]!,
-                ...(extraCount === 0 ? [] : [extraKind === "ai" ? `${extraCount} mise${extraCount > 1 ? "s" : ""} en scène IA (OpenAI)` : `${extraCount} montage${extraCount > 1 ? "s" : ""} avec le produit d'origine`]),
+                ...(extraCount === 0 ? [] : [extraKind === "ai" ? `${extraCount} photo${extraCount > 1 ? "s" : ""} IA ${sceneBackground === "white" ? "sur fond blanc" : "mise" + (extraCount > 1 ? "s" : "") + " en scène"} (OpenAI)` : `${extraCount} montage${extraCount > 1 ? "s" : ""} avec le produit d'origine`]),
                 ...(configured ? [STEPS[2]!] : []),
               ].map((step) => (
                 <li key={step} className="flex items-center gap-2">
@@ -183,7 +185,7 @@ export function NewProductAi({
                     <div className="grid gap-1.5">
                       {([
                         ["montage", "Montages avec le produit d'origine", "Studio, table en bois. Produit identique au pixel près. Gratuit."],
-                        ["ai", "Mises en scène IA réalistes", `Redessinées par OpenAI (à vérifier), ${formatUsd(TYPICAL_COST_USD.aiScene)} par photo, environ une minute.`],
+                        ["ai", "Photos générées par l'IA", `Redessinées par OpenAI (à vérifier), ${formatUsd(TYPICAL_COST_USD.aiScene)} par photo, environ une minute.`],
                       ] as const).map(([kind, label, hint]) => (
                         <label
                           key={kind}
@@ -204,6 +206,32 @@ export function NewProductAi({
                           </span>
                         </label>
                       ))}
+                      {aiScenes && (
+                        <div className="grid gap-1 pl-6" role="radiogroup" aria-label="Fond des photos générées par l'IA">
+                          <span className="text-xs font-medium">Fond des photos IA</span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {([
+                              ["white", "Blanc pur #FFFFFF (recommandé)"],
+                              ["scene", "Mise en scène (table, studio)"],
+                            ] as const).map(([value, label]) => (
+                              <label
+                                key={value}
+                                className={`inline-flex h-8 cursor-pointer items-center rounded-full border px-3 text-xs has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring ${sceneBackground === value ? "border-primary bg-primary/5 font-medium" : ""}`}
+                              >
+                                <input
+                                  type="radio"
+                                  name="ai-scene-background"
+                                  value={value}
+                                  checked={sceneBackground === value}
+                                  onChange={() => setSceneBackground(value)}
+                                  className="sr-only"
+                                />
+                                {label}
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </fieldset>
@@ -229,7 +257,7 @@ export function NewProductAi({
 
                 <p className="text-sm" aria-live="polite">
                   Coût estimé de cette génération : <strong>{formatUsd(cost)}</strong>
-                  {aiScenes && <span className="text-muted-foreground"> (dont {extraCount} × {formatUsd(TYPICAL_COST_USD.aiScene).replace("≈ ", "")} de mises en scène)</span>}
+                  {aiScenes && <span className="text-muted-foreground"> (dont {extraCount} × {formatUsd(TYPICAL_COST_USD.aiScene).replace("≈ ", "")} de photos IA)</span>}
                 </p>
                 {!configured && (
                   <p className="flex items-start gap-1.5 text-amber-800">
