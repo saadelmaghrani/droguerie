@@ -3,6 +3,7 @@
 import "server-only";
 
 import { Prisma } from "@/generated/prisma/client";
+import { cleanCategoryName, findSimilarCategory, uniqueCategorySlug } from "@/lib/category-match";
 import { prisma } from "@/lib/prisma";
 
 export type CategoryField = "name" | "slug" | "description" | "whatsappNumberId";
@@ -181,4 +182,32 @@ export async function deleteCategory(id: string): Promise<ServiceResult> {
     throw error;
   }
   return { ok: true, message: `Catégorie « ${category.name} » supprimée.` };
+}
+
+/**
+ * Catégorie proposée automatiquement (IA) : réutilise une catégorie équivalente si elle existe
+ * (même nom à l'accent / au pluriel / aux mots génériques près, ou même adresse), sinon la crée
+ * (adresse unique, en fin de liste, visible). À appeler DANS la transaction qui crée le produit :
+ * si la création du produit échoue, aucune catégorie vide ne reste.
+ */
+export async function findOrCreateCategory(
+  tx: Prisma.TransactionClient,
+  rawName: string,
+): Promise<{ id: string; name: string; created: boolean } | null> {
+  const name = cleanCategoryName(rawName);
+  if (!name) return null;
+  const all = await tx.category.findMany({ select: { id: true, name: true, slug: true } });
+  const similar = findSimilarCategory(name, all);
+  if (similar) return { id: similar.id, name: similar.name, created: false };
+  const last = await tx.category.aggregate({ _max: { sortOrder: true } });
+  const created = await tx.category.create({
+    data: {
+      name,
+      slug: uniqueCategorySlug(name, new Set(all.map((c) => c.slug))),
+      sortOrder: (last._max.sortOrder ?? -1) + 1,
+      isActive: true,
+    },
+    select: { id: true, name: true },
+  });
+  return { ...created, created: true };
 }

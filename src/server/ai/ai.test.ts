@@ -1,7 +1,7 @@
 import { APIConnectionError, APIError } from "openai";
 import { describe, expect, it } from "vitest";
 import { AI_MESSAGES, AiError, classifyOpenAiError, kindFromErrorFields, TECH_HINTS } from "./errors";
-import { buildProductTextPrompt, cleanNotes, estimateCostUsd, NOTES_MAX_LENGTH, parseProductTextOutput } from "./product-text-prompt";
+import { buildProductTextPrompt, cleanNotes, estimateCostUsd, NOTES_MAX_LENGTH, parseProductTextOutput, PRODUCT_TEXT_SCHEMA, resolveCategory } from "./product-text-prompt";
 
 const apiError = (status: number, code?: string, type?: string) =>
   APIError.generate(status, { error: { code, type, message: "détail" } }, "détail", new Headers());
@@ -81,7 +81,10 @@ describe("lecture de la réponse", () => {
     expect(parseProductTextOutput('{"name":" Seau 10 L ","description":"Seau robuste."}')).toEqual({
       name: "Seau 10 L",
       description: "Seau robuste.",
+      category_ref: "",
+      new_category: "",
     });
+    expect(parseProductTextOutput('{"name":"Seau","description":"d","category_ref":" C2 ","new_category":""}')?.category_ref).toBe("C2");
   });
   it("JSON invalide, nom trop long ou vide → null", () => {
     expect(parseProductTextOutput("pas du json")).toBeNull();
@@ -96,5 +99,40 @@ describe("coût estimé", () => {
   });
   it("modèle inconnu → 0", () => {
     expect(estimateCostUsd("autre-modele", 1000, 1000)).toBe(0);
+  });
+});
+
+describe("catégorie proposée par l'IA", () => {
+  const categories = [
+    { id: "id-entretien", name: "Entretien", slug: "entretien" },
+    { id: "id-peinture", name: "Peinture", slug: "peinture" },
+    { id: "id-main", name: "Outillage à main", slug: "outillage-a-main" },
+  ];
+  const out = (category_ref: string, new_category = "") => ({ category_ref, new_category });
+
+  it("la consigne liste TOUTES les catégories existantes avec un code", () => {
+    const prompt = buildProductTextPrompt({ name: "", description: "", brand: "", reference: "", categoryName: "" }, true, categories);
+    expect(prompt).toContain("Catégories existantes :\n- C1 : Entretien\n- C2 : Peinture\n- C3 : Outillage à main");
+    expect(buildProductTextPrompt({ name: "", description: "", brand: "", reference: "", categoryName: "" }, true)).toContain("(aucune catégorie pour l'instant)");
+  });
+  it("le format de réponse impose les deux champs de catégorie", () => {
+    expect(PRODUCT_TEXT_SCHEMA.required).toEqual(["name", "description", "category_ref", "new_category"]);
+  });
+  it("code valide → catégorie existante", () => {
+    expect(resolveCategory(out("C2"), categories)).toEqual({ kind: "existing", id: "id-peinture", name: "Peinture" });
+    expect(resolveCategory(out("c3"), categories)).toEqual({ kind: "existing", id: "id-main", name: "Outillage à main" });
+  });
+  it("code inconnu et aucun nom → null (choix manuel)", () => {
+    expect(resolveCategory(out("C9"), categories)).toBeNull();
+    expect(resolveCategory(out(""), categories)).toBeNull();
+    expect(resolveCategory(out("", "  "), categories)).toBeNull();
+  });
+  it("nouveau nom équivalent à une catégorie existante → réutilisée, jamais de doublon", () => {
+    expect(resolveCategory(out("", "Outils à main"), categories)).toEqual({ kind: "existing", id: "id-main", name: "Outillage à main" });
+    expect(resolveCategory(out("", "Produits d'entretien"), categories)).toEqual({ kind: "existing", id: "id-entretien", name: "Entretien" });
+    expect(resolveCategory(out("", "PEINTURES"), categories)).toEqual({ kind: "existing", id: "id-peinture", name: "Peinture" });
+  });
+  it("aucune catégorie ne correspond → nouvelle catégorie au nom propre", () => {
+    expect(resolveCategory(out("", " « cadenas et serrures ». "), categories)).toEqual({ kind: "new", name: "Cadenas et serrures" });
   });
 });

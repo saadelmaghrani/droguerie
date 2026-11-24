@@ -22,14 +22,14 @@ import { DEFAULT_SCENE_BACKGROUND, type ExtraCount, type ExtraKind, type SceneBa
 import { currentKeyHint } from "./client";
 import { ACCOUNT_ACTION_KINDS, AiError, classifyOpenAiError, KEY_ERROR_KINDS, logAiError } from "./errors";
 import { generateProductText } from "./product-text";
-import { estimateCostUsd, type ProductTextHints } from "./product-text-prompt";
+import { estimateCostUsd, type CategorySuggestion, type ProductTextHints } from "./product-text-prompt";
 import { budgetError, ESTIMATED_COST_USD } from "./budget";
 import { estimateImageCostUsd, sceneFromOpenAi } from "./scenes-openai";
 import { composeMontage, composeWhite, cutoutProduct, MONTAGE_LABELS, type CutoutProduct, type MontageStyle } from "./studio-cutout";
 
 export type DraftImage = { key: string; width: number; height: number };
 export type DraftPart<T> = { ok: true; value: T } | { ok: false; message: string; accountAction: boolean };
-export type DraftText = { name: string; description: string };
+export type DraftText = { name: string; description: string; category: CategorySuggestion | null };
 /** Photos supplémentaires proposées : montages locaux (fidèles) puis, en option, mises en scène IA. */
 export const EXTRA_SLOTS = ["montage-studio", "montage-table", "ai-0", "ai-1"] as const;
 export type ExtraSlot = (typeof EXTRA_SLOTS)[number];
@@ -194,7 +194,12 @@ export async function createProductDraft(
     : [];
   const text = runPart<DraftText>(ctx, "TEXT", "openai", "", async () => {
     guard();
-    const result = await generateProductText(medium, hints);
+    // Liste COMPLÈTE des catégories (y compris masquées) : l'IA choisit d'abord parmi elles.
+    const categories = await prisma.category.findMany({
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+      select: { id: true, name: true, slug: true },
+    });
+    const result = await generateProductText(medium, hints, categories);
     return {
       value: result.suggestion,
       output: result.suggestion,

@@ -11,14 +11,20 @@ import {
   PRODUCT_TEXT_INSTRUCTIONS,
   PRODUCT_TEXT_SCHEMA,
   parseProductTextOutput,
+  resolveCategory,
+  type CategoryOption,
   type ProductTextHints,
   type ProductTextSuggestion,
 } from "./product-text-prompt";
 
-/** Appel OpenAI : photo (WebP) + indices → nom et description validés. Lève AiError en cas d'échec. */
+/**
+ * Appel OpenAI : photo (WebP) + indices + liste des catégories existantes → nom, description et catégorie
+ * vérifiés. Lève AiError en cas d'échec. Ne crée RIEN en base (la catégorie nouvelle est créée à l'enregistrement).
+ */
 export async function generateProductText(
   photoWebp: Buffer,
   hints: ProductTextHints,
+  categories: readonly CategoryOption[] = [],
 ): Promise<{ suggestion: ProductTextSuggestion; model: string; inputTokens: number; outputTokens: number }> {
   const model = aiModel();
   const response = await openai().responses.create({
@@ -28,7 +34,7 @@ export async function generateProductText(
       {
         role: "user",
         content: [
-          { type: "input_text", text: buildProductTextPrompt(hints, true) },
+          { type: "input_text", text: buildProductTextPrompt(hints, true, categories) },
           { type: "input_image", image_url: `data:image/webp;base64,${photoWebp.toString("base64")}`, detail: "auto" },
         ],
       },
@@ -37,7 +43,10 @@ export async function generateProductText(
     max_output_tokens: 2000,
     store: false, // OpenAI ne conserve pas la conversation
   });
-  const suggestion = response.status === "completed" ? parseProductTextOutput(response.output_text) : null;
+  const output = response.status === "completed" ? parseProductTextOutput(response.output_text) : null;
+  const suggestion: ProductTextSuggestion | null = output
+    ? { name: output.name, description: output.description, category: resolveCategory(output, categories) }
+    : null;
   if (!suggestion) {
     throw new AiError("bad_response", `status=${response.status} ${response.incomplete_details?.reason ?? ""} ${response.output_text.slice(0, 200)}`);
   }

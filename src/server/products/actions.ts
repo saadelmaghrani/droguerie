@@ -4,6 +4,7 @@
 import { refresh } from "next/cache";
 import { invalidateCatalogue } from "@/server/catalogue/cache";
 import { z } from "zod";
+import { cleanCategoryName } from "@/lib/category-match";
 import { isValidSlug, SLUG_MAX_LENGTH, slugify } from "@/lib/slug";
 import { requireAdmin } from "@/server/auth/dal";
 import {
@@ -31,7 +32,7 @@ export type ProductFormValues = {
 };
 
 export type ProductFormState =
-  | { ok: true; message: string; id: string; created: boolean; pendingPublish: boolean; submissionId: number }
+  | { ok: true; message: string; id: string; created: boolean; pendingPublish: boolean; createdCategory?: string; submissionId: number }
   | { ok: false; message: string; fieldErrors: Partial<Record<ProductField, string>>; values: ProductFormValues; submissionId: number }
   | undefined;
 
@@ -45,7 +46,7 @@ const formSchema = z.object({
   description: optional(5000, "Description"),
   reference: optional(50, "Référence"),
   brand: optional(60, "Marque"),
-  categoryId: z.uuid("Choisissez une catégorie."),
+  categoryId: z.union([z.uuid("Choisissez une catégorie."), z.literal("")]),
   status: z.enum(STATUSES, "Statut invalide."),
 });
 
@@ -64,6 +65,10 @@ export async function saveProduct(_previous: ProductFormState, formData: FormDat
     isFeatured: formData.get("isFeatured") === "on",
   };
 
+  // Nouvelle catégorie proposée par l'IA : seulement à la création, et seulement si aucune catégorie n'est choisie.
+  const isCreation = !String(formData.get("id") ?? "");
+  const newCategory = isCreation && !values.categoryId ? cleanCategoryName(text("newCategoryName", 200)) : "";
+
   const parsed = formSchema.safeParse({ id: formData.get("id") ?? "", ...values, status: text("status", 20) });
   const fieldErrors: Partial<Record<ProductField, string>> = {};
   if (!parsed.success) {
@@ -72,6 +77,7 @@ export async function saveProduct(_previous: ProductFormState, formData: FormDat
     }
     for (const issue of parsed.error.issues) fieldErrors[issue.path[0] as ProductField] ??= issue.message;
   }
+  if (!values.categoryId && !newCategory) fieldErrors.categoryId ??= "Choisissez une catégorie.";
   // Adresse : vide → générée depuis le nom ; sinon elle doit être valide.
   const slug = parsed.success ? parsed.data.slug || slugify(parsed.data.name) : "";
   if (parsed.success && !isValidSlug(slug)) {
@@ -83,7 +89,7 @@ export async function saveProduct(_previous: ProductFormState, formData: FormDat
 
   const { id, name, description, reference, brand, categoryId, status } = parsed.data;
   const data = { name, slug, description, reference, brand, categoryId, status, isFeatured: values.isFeatured };
-  const result = id ? await updateProduct(id, data) : await createProduct(data);
+  const result = id ? await updateProduct(id, data) : await createProduct(data, newCategory || undefined);
 
   if (!result.ok) {
     return {
@@ -96,7 +102,15 @@ export async function saveProduct(_previous: ProductFormState, formData: FormDat
   }
   refresh();
   invalidateCatalogue();
-  return { ok: true, message: result.message, id: result.id!, created: !id, pendingPublish: result.pendingPublish ?? false, submissionId };
+  return {
+    ok: true,
+    message: result.message,
+    id: result.id!,
+    created: !id,
+    pendingPublish: result.pendingPublish ?? false,
+    createdCategory: result.ok ? result.createdCategory : undefined,
+    submissionId,
+  };
 }
 
 async function runRowAction(id: unknown, operation: (id: string) => Promise<ServiceResult>): Promise<ServiceResult> {

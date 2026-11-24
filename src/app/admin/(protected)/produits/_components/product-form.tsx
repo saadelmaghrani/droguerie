@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { ArrowLeft, CircleAlert, Eye, Loader2, Star, Trash2, TriangleAlert } from "lucide-react";
+import { ArrowLeft, CircleAlert, Eye, Loader2, Sparkles, Star, Trash2, TriangleAlert } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -29,6 +29,7 @@ import { PHOTO_REQUIRED_TO_PUBLISH } from "@/lib/product-visibility";
 import { changeProductStatus } from "@/server/products/actions";
 import { uploadProductImage } from "@/server/products/image-actions";
 import { attachProductDraftAction } from "@/server/ai/actions";
+import type { CategorySuggestion } from "@/server/ai/product-text-prompt";
 import { defaultDraftChoice, DraftPhotos, type DraftChoice } from "./draft-photos";
 import { NewProductAi, type ProductDraft } from "./new-product-ai";
 import { PendingImages, type PendingImage } from "./pending-images";
@@ -36,6 +37,8 @@ import { ProductImages, type ProductImage } from "./product-images";
 
 export type EditableProduct = ProductFormValues & { id: string; imageCount: number; images: ProductImage[] };
 type CategoryOption = { id: string; name: string; isActive: boolean };
+/** Valeur du menu « Catégorie » pour la nouvelle catégorie proposée par l'IA (créée à l'enregistrement). */
+const NEW_CATEGORY = "__nouvelle__";
 
 function FieldError({ id, message }: { id: string; message?: string }) {
   if (!message) return null;
@@ -82,6 +85,10 @@ export function ProductForm({
   const [draft, setDraft] = useState<ProductDraft | null>(null);
   const [draftChoice, setDraftChoice] = useState<DraftChoice>({ main: "original", keep: [] });
   const [generating, setGenerating] = useState(false);
+  // Catégorie proposée par l'IA (existante ou nouvelle) et choix « nouvelle catégorie » en cours.
+  const [aiCategory, setAiCategory] = useState<CategorySuggestion | null>(null);
+  const [useNewCategory, setUseNewCategory] = useState(false);
+  const newCategoryName = useNewCategory && aiCategory?.kind === "new" ? aiCategory.name : "";
   // Nouveau produit : photo principale obligatoire (message affiché si l'admin tente de créer sans photo).
   const [photoMissing, setPhotoMissing] = useState(false);
   const [slugEdited, setSlugEdited] = useState(Boolean(product));
@@ -94,6 +101,7 @@ export function ProductForm({
       return;
     }
     toast.success(state.message);
+    if (state.createdCategory) toast.success(`Catégorie « ${state.createdCategory} » créée automatiquement.`);
     if (!state.created) return;
     // Création réussie → envoi des photos choisies, puis page de modification du nouveau produit.
     const productId = state.id;
@@ -177,6 +185,7 @@ export function ProductForm({
     >
       <input type="hidden" name="id" value={product?.id ?? ""} />
       <input type="hidden" name="categoryId" value={values.categoryId} />
+      <input type="hidden" name="newCategoryName" value={newCategoryName} />
       <input type="hidden" name="isFeatured" value={values.isFeatured ? "on" : ""} />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
@@ -193,11 +202,24 @@ export function ProductForm({
                 setDraft(result);
                 setDraftChoice(defaultDraftChoice(result));
                 if (result.text.ok) {
-                  const { name, description } = result.text.value;
+                  const { name, description, category: suggested } = result.text.value;
                   setValues((v) => ({ ...v, name, description, slug: slugEdited ? v.slug : slugify(name) }));
+                  // Catégorie : appliquée seulement si l'admin n'en a pas déjà choisi une (son choix prime).
+                  if (suggested && !values.categoryId) {
+                    setAiCategory(suggested);
+                    if (suggested.kind === "existing") {
+                      set("categoryId", suggested.id);
+                      setUseNewCategory(false);
+                    } else setUseNewCategory(true);
+                  }
                 }
               }}
-              onReset={() => setDraft(null)}
+              onReset={() => {
+                setDraft(null);
+                // Nouvelle catégorie proposée : abandonnée avec la proposition (une catégorie existante choisie reste).
+                setUseNewCategory(false);
+                setAiCategory((c) => (c?.kind === "new" ? null : c));
+              }}
             />
           )}
           <Card>
@@ -369,7 +391,15 @@ export function ProductForm({
             <CardContent className="grid gap-5">
               <div className="grid gap-2">
                 <Label htmlFor="p-category">Catégorie</Label>
-                <Select value={values.categoryId} onValueChange={(v) => set("categoryId", v)} disabled={pending}>
+                <Select
+                  value={newCategoryName ? NEW_CATEGORY : values.categoryId}
+                  onValueChange={(v) => {
+                    // La proposition « nouvelle catégorie » reste dans la liste : on peut y revenir.
+                    setUseNewCategory(v === NEW_CATEGORY);
+                    set("categoryId", v === NEW_CATEGORY ? "" : v);
+                  }}
+                  disabled={pending}
+                >
                   <SelectTrigger
                     id="p-category"
                     className="w-full"
@@ -379,6 +409,11 @@ export function ProductForm({
                     <SelectValue placeholder="Choisir une catégorie" />
                   </SelectTrigger>
                   <SelectContent>
+                    {aiCategory?.kind === "new" && (
+                      <SelectItem value={NEW_CATEGORY}>
+                        {aiCategory.name} (nouvelle)
+                      </SelectItem>
+                    )}
                     {categories.map((c) => (
                       <SelectItem key={c.id} value={c.id}>
                         {c.name}
@@ -388,7 +423,8 @@ export function ProductForm({
                   </SelectContent>
                 </Select>
                 <FieldError id="p-categoryId-error" message={errorOf("categoryId")} />
-                {categories.length === 0 && (
+                <CategoryAiNote suggestion={aiCategory} selected={newCategoryName ? "new" : aiCategory?.kind === "existing" && values.categoryId === aiCategory.id ? "existing" : null} />
+                {categories.length === 0 && !newCategoryName && (
                   <p className="text-sm text-amber-700">
                     Aucune catégorie : <Link href="/admin/categories" className="underline">créez-en une d&apos;abord</Link>.
                   </p>
@@ -499,5 +535,25 @@ function DeleteProduct({ id, name }: { id: string; name: string }) {
         </AlertDialogContent>
       </AlertDialog>
     </>
+  );
+}
+
+/** Indique clairement que la catégorie affichée a été choisie, ou sera créée, par l'IA. */
+function CategoryAiNote({ suggestion, selected }: { suggestion: CategorySuggestion | null; selected: "new" | "existing" | null }) {
+  if (!suggestion || !selected) return null;
+  return (
+    <p className="flex items-start gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-2 text-xs text-violet-900" data-testid="category-ai-note">
+      <Sparkles className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+      {selected === "new" ? (
+        <span>
+          <strong>Nouvelle catégorie proposée par l&apos;IA</strong> : aucune catégorie existante ne correspond. Elle sera créée
+          automatiquement à l&apos;enregistrement. Vous pouvez en choisir une autre dans la liste.
+        </span>
+      ) : (
+        <span>
+          <strong>Catégorie choisie par l&apos;IA</strong> parmi vos catégories existantes. Vous pouvez la modifier.
+        </span>
+      )}
+    </p>
   );
 }

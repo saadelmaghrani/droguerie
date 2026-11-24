@@ -6,6 +6,7 @@ import { Prisma, type ProductStatus } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { publishBlockedReason } from "@/lib/product-visibility";
 import { slugify } from "@/lib/slug";
+import { findOrCreateCategory } from "@/server/categories/service";
 import { deleteImageFiles } from "@/server/media/images";
 import { productImageKeys } from "./images-service";
 
@@ -13,7 +14,7 @@ export const PRODUCTS_PAGE_SIZE = 20;
 
 export type ProductField = "name" | "slug" | "description" | "reference" | "brand" | "categoryId" | "status";
 export type ServiceResult =
-  | { ok: true; message: string; id?: string; pendingPublish?: boolean }
+  | { ok: true; message: string; id?: string; pendingPublish?: boolean; /** Catégorie créée automatiquement pour ce produit. */ createdCategory?: string }
   | { ok: false; message: string; field?: ProductField };
 
 export type ProductListRow = {
@@ -182,10 +183,11 @@ async function availableSlug(base: string, excludeId?: string): Promise<string> 
   for (let n = 2; ; n++) if (!taken.has(`${root}-${n}`)) return `${root}-${n}`;
 }
 
-async function validate(data: ProductInput, excludeId?: string): Promise<ServiceResult | null> {
+/** newCategory : nom d'une catégorie à créer (proposée par l'IA) → pas de catégorie existante à vérifier. */
+async function validate(data: ProductInput, excludeId?: string, newCategory?: string): Promise<ServiceResult | null> {
   const notSelf = excludeId ? { id: { not: excludeId } } : {};
   const [category, sameReference] = await Promise.all([
-    prisma.category.findUnique({ where: { id: data.categoryId }, select: { id: true } }),
+    newCategory ? Promise.resolve({ id: "" }) : prisma.category.findUnique({ where: { id: data.categoryId }, select: { id: true } }),
     data.reference
       ? prisma.product.findFirst({
           where: { reference: { equals: data.reference, mode: "insensitive" }, ...notSelf },
@@ -205,8 +207,12 @@ function uniqueViolation(error: unknown): ServiceResult | null {
   return { ok: false, message: "Cette adresse ou cette référence vient d'être utilisée par un autre produit. Réessayez." };
 }
 
-export async function createProduct(data: ProductInput): Promise<ServiceResult> {
-  const invalid = await validate(data);
+/**
+ * @param newCategory nom d'une nouvelle catégorie proposée par l'IA (data.categoryId ignoré) : une catégorie
+ *   équivalente existante est réutilisée, sinon elle est créée — dans la MÊME transaction que le produit.
+ */
+export async function createProduct(data: ProductInput, newCategory?: string): Promise<ServiceResult> {
+  const invalid = await validate(data, undefined, newCategory);
   if (invalid) return invalid;
   try {
     // À la création, une adresse déjà prise reçoit automatiquement un suffixe (-2, -3…).
@@ -214,10 +220,22 @@ export async function createProduct(data: ProductInput): Promise<ServiceResult> 
     // Photo obligatoire pour publier : un nouveau produit n'a pas encore de photo (elles sont envoyées
     // juste après la création). Il est donc créé en brouillon, puis publié une fois la photo ajoutée.
     const pendingPublish = data.status === "PUBLISHED";
-    const product = await prisma.product.create({
-      data: { ...data, slug, status: pendingPublish ? "DRAFT" : data.status, publishedAt: null },
+    const { product, category } = await prisma.$transaction(async (tx) => {
+      const category = newCategory ? await findOrCreateCategory(tx, newCategory) : null;
+      if (newCategory && !category) return { product: null, category: null };
+      const product = await tx.product.create({
+        data: { ...data, categoryId: category?.id ?? data.categoryId, slug, status: pendingPublish ? "DRAFT" : data.status, publishedAt: null },
+      });
+      return { product, category };
     });
-    return { ok: true, message: `Produit « ${product.name} » créé.`, id: product.id, pendingPublish };
+    if (!product) return { ok: false, message: "Choisissez une catégorie.", field: "categoryId" };
+    return {
+      ok: true,
+      message: `Produit « ${product.name} » créé.`,
+      id: product.id,
+      pendingPublish,
+      createdCategory: category?.created ? category.name : undefined,
+    };
   } catch (error) {
     const duplicate = uniqueViolation(error);
     if (duplicate) return duplicate;

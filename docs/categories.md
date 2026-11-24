@@ -32,3 +32,9 @@ Page d'administration : `/admin/categories`. Un seul niveau (pas de sous-catégo
 | `src/server/categories/service.ts` | Règles métier et accès base |
 | `src/server/categories/actions.ts` | Actions serveur : `requireAdmin()` → zod → service → `refresh()` |
 | `src/app/admin/(protected)/categories/` | Page, liste, formulaire, confirmation |
+
+## Catégories créées automatiquement (IA)
+
+Sur « Nouveau produit », l'IA peut proposer une nouvelle catégorie si aucune existante ne correspond ; elle est
+créée à l'enregistrement du produit (fin de liste, visible, adresse unique) et se gère ensuite comme les autres.
+Détails : `docs/ai.md` › « Catégorie automatique ».

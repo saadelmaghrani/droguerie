@@ -90,6 +90,29 @@ Modèle de détourage : `npm run ai:model` une fois par machine **et sur le serv
 (≈ 170 Mo, ISNet, licence Apache-2.0, MD5 vérifié), exécuté par `onnxruntime-node` (MIT).
 `@imgly/background-removal-node` écarté : licence AGPL.
 
+## Catégorie automatique
+
+Lors de l'analyse de la photo (« Générer avec l'IA »), l'IA reçoit la **liste complète** des catégories
+(codes C1, C2…, masquées comprises) et répond `category_ref` (catégorie existante) **ou** `new_category`
+(seulement si aucune ne convient réellement, nom court en français, famille générale).
+
+Garde-fou serveur (`src/lib/category-match.ts`, testé) : un nouveau nom équivalent à une catégorie existante
+(accents, majuscules, pluriel, petits mots, mots génériques « produits / matériel… », variantes simples
+« outils = outillage », « jardin = jardinage », ou même adresse) est **rattaché à l'existante** — pas de doublon.
+
+Formulaire « Nouveau produit » :
+- catégorie existante → sélectionnée, mention « Catégorie choisie par l'IA » ;
+- nouvelle → option « Nom (nouvelle) » sélectionnée, mention « Nouvelle catégorie proposée par l'IA… créée
+  automatiquement à l'enregistrement » ;
+- une catégorie déjà choisie par l'admin avant la génération n'est jamais remplacée ;
+- modifiable avant (menu) et après l'enregistrement (fiche).
+
+Création : à « Créer le produit », dans la **même transaction** que le produit (`findOrCreateCategory`,
+`src/server/categories/service.ts`) : nouvelle vérification anti-doublon, adresse unique (`-2`, `-3`…),
+placée en fin de liste, visible. Message « Catégorie « X » créée automatiquement ». Rien n'est créé si l'admin
+choisit une autre catégorie ou abandonne. IA désactivée ou en échec : choix manuel inchangé ; la création
+manuelle d'une catégorie se fait toujours dans Catégories.
+
 ## Clé API : provenance, contrôle et rechargement
 
 **D'où vient la clé ?** Next.js cherche `OPENAI_API_KEY` dans cet ordre et garde la PREMIÈRE trouvée :
