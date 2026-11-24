@@ -1,7 +1,7 @@
 import { APIConnectionError, APIError } from "openai";
 import { describe, expect, it } from "vitest";
 import { AI_MESSAGES, AiError, classifyOpenAiError, kindFromErrorFields, TECH_HINTS } from "./errors";
-import { buildProductTextPrompt, cleanNotes, estimateCostUsd, NOTES_MAX_LENGTH, parseProductTextOutput, PRODUCT_TEXT_SCHEMA, resolveCategory } from "./product-text-prompt";
+import { buildProductTextPrompt, cleanNotes, estimateCostUsd, NOTES_MAX_LENGTH, parseProductTextOutput, PRODUCT_TEXT_INSTRUCTIONS, PRODUCT_TEXT_SCHEMA, resolveCategory } from "./product-text-prompt";
 
 const apiError = (status: number, code?: string, type?: string) =>
   APIError.generate(status, { error: { code, type, message: "détail" } }, "détail", new Headers());
@@ -83,6 +83,7 @@ describe("lecture de la réponse", () => {
       description: "Seau robuste.",
       category_ref: "",
       new_category: "",
+      fallback_ref: "",
     });
     expect(parseProductTextOutput('{"name":"Seau","description":"d","category_ref":" C2 ","new_category":""}')?.category_ref).toBe("C2");
   });
@@ -116,7 +117,7 @@ describe("catégorie proposée par l'IA", () => {
     expect(buildProductTextPrompt({ name: "", description: "", brand: "", reference: "", categoryName: "" }, true)).toContain("(aucune catégorie pour l'instant)");
   });
   it("le format de réponse impose les deux champs de catégorie", () => {
-    expect(PRODUCT_TEXT_SCHEMA.required).toEqual(["name", "description", "category_ref", "new_category"]);
+    expect(PRODUCT_TEXT_SCHEMA.required).toEqual(["name", "description", "category_ref", "new_category", "fallback_ref"]);
   });
   it("code valide → catégorie existante", () => {
     expect(resolveCategory(out("C2"), categories)).toEqual({ kind: "existing", id: "id-peinture", name: "Peinture" });
@@ -133,6 +134,28 @@ describe("catégorie proposée par l'IA", () => {
     expect(resolveCategory(out("", "PEINTURES"), categories)).toEqual({ kind: "existing", id: "id-peinture", name: "Peinture" });
   });
   it("aucune catégorie ne correspond → nouvelle catégorie au nom propre", () => {
-    expect(resolveCategory(out("", " « cadenas et serrures ». "), categories)).toEqual({ kind: "new", name: "Cadenas et serrures" });
+    expect(resolveCategory(out("", " « cadenas et serrures ». "), categories)).toEqual({ kind: "new", name: "Cadenas et serrures", alternative: null });
+  });
+  it("famille spécifique sans catégorie dédiée → nouvelle catégorie + catégorie large proposée en alternative", () => {
+    const withHardware = [...categories, { id: "id-quinc", name: "Quincaillerie", slug: "quincaillerie" }];
+    expect(resolveCategory({ category_ref: "", new_category: "Visserie", fallback_ref: "C4" }, withHardware)).toEqual({
+      kind: "new",
+      name: "Visserie",
+      alternative: { id: "id-quinc", name: "Quincaillerie" },
+    });
+    // Alternative invalide : ignorée.
+    expect(resolveCategory({ category_ref: "", new_category: "Visserie", fallback_ref: "C99" }, withHardware)).toEqual({ kind: "new", name: "Visserie", alternative: null });
+  });
+  it("famille qui a déjà sa catégorie (autre nom) → réutilisée, jamais de doublon", () => {
+    const withScrews = [...categories, { id: "id-vis", name: "Visserie", slug: "visserie" }, { id: "id-colle", name: "Colles et adhésifs", slug: "colles-et-adhesifs" }];
+    expect(resolveCategory({ category_ref: "", new_category: "Vis", fallback_ref: "C1" }, withScrews)).toEqual({ kind: "existing", id: "id-vis", name: "Visserie" });
+    expect(resolveCategory(out("", "Colles"), withScrews)).toEqual({ kind: "existing", id: "id-colle", name: "Colles et adhésifs" });
+  });
+  it("la consigne explique quand créer une famille spécifique plutôt que réutiliser une catégorie large", () => {
+    const prompt = PRODUCT_TEXT_INSTRUCTIONS;
+    expect(prompt).toMatch(/catégorie LARGE/);
+    expect(prompt).toMatch(/famille distincte et bien identifiée/);
+    expect(prompt).toMatch(/« Vis » si « Visserie » existe/);
+    expect(PRODUCT_TEXT_SCHEMA.required).toContain("fallback_ref");
   });
 });

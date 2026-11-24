@@ -11,7 +11,10 @@ export type CategoryOption = { id: string; name: string; slug: string };
  * - existing : une catégorie de la base (choisie par l'IA, ou nom proposé reconnu comme équivalent) ;
  * - new : aucune ne convient → nom propre, créée seulement à l'enregistrement du produit.
  */
-export type CategorySuggestion = { kind: "existing"; id: string; name: string } | { kind: "new"; name: string };
+export type CategorySuggestion =
+  | { kind: "existing"; id: string; name: string }
+  /** alternative : catégorie large existante qui pourrait aussi accueillir le produit (proposée au magasin). */
+  | { kind: "new"; name: string; alternative: { id: string; name: string } | null };
 
 export type ProductTextHints = {
   name: string;
@@ -50,13 +53,24 @@ Règles :
   si visible (ex. « Peinture acrylique blanc mat 10 L »).
 - "description" : 2 à 5 phrases (400 à 900 caractères), suivies si utile d'une courte liste de points commençant par « - »
   (usages, conditionnement). Pas de titre, pas de markdown autre que ces tirets.
-- Catégorie du catalogue ("category_ref" et "new_category") :
-  1. Parcours d'abord TOUTE la liste « Catégories existantes ». Si l'une correspond au produit, même avec une autre
-     formulation ou un synonyme (ex. « Outils » = « Outillage », « Nettoyage » = « Entretien »), mets son code
-     (ex. « C3 ») dans "category_ref" et laisse "new_category" vide. Préfère la catégorie la plus précise qui convient.
-  2. Seulement si AUCUNE ne convient réellement, laisse "category_ref" vide et propose dans "new_category" un nom de
-     catégorie en français : 1 à 4 mots, famille générale de produits (ex. « Colles et adhésifs », « Plomberie »),
-     sans marque, sans dimension, sans nom de produit précis.`;
+- Catégorie du catalogue ("category_ref", "new_category", "fallback_ref") : parcours d'abord TOUTE la liste
+  « Catégories existantes », puis applique la PREMIÈRE règle qui s'applique :
+  1. Une catégorie existante est DÉDIÉE à la famille du produit, même avec une autre formulation ou un synonyme
+     (ex. « Visserie » pour une vis, « Outils » = « Outillage », « Nettoyage » = « Entretien ») : mets son code
+     (ex. « C3 ») dans "category_ref", laisse "new_category" et "fallback_ref" vides.
+  2. Aucune catégorie dédiée, seulement une catégorie LARGE qui pourrait l'accueillir (ex. « Quincaillerie »,
+     « Outillage », « Divers »), ET le produit appartient à une famille distincte et bien identifiée, utile pour
+     ranger le catalogue (plusieurs produits du magasin peuvent y entrer, un client la chercherait) — ex. vis →
+     « Visserie », chevilles → « Chevilles et fixations », cadenas → « Cadenas et serrures », ampoules → « Éclairage » :
+     propose cette famille dans "new_category", laisse "category_ref" vide, et mets le code de la catégorie large
+     dans "fallback_ref" (alternative proposée au magasin).
+  3. Une catégorie existante convient et le produit n'appartient pas à une famille distincte (article isolé ou
+     difficile à regrouper) : mets son code dans "category_ref", laisse les deux autres champs vides.
+  4. Aucune catégorie existante ne convient : propose "new_category", laisse les deux autres champs vides.
+  Nom d'une nouvelle catégorie : français, 1 à 4 mots, nom de famille de produits (ex. « Visserie », « Colles et
+  adhésifs », « Plomberie »), ni marque, ni dimension, ni modèle, ni nom de produit précis. Ne propose jamais une
+  catégorie qui existe déjà sous un autre nom (« Vis » si « Visserie » existe, « Colles » si « Colles et adhésifs »
+  existe) : dans ce cas, applique la règle 1.`;
 
 /** Format imposé à la réponse (Structured Outputs, strict). */
 export const PRODUCT_TEXT_SCHEMA = {
@@ -65,9 +79,10 @@ export const PRODUCT_TEXT_SCHEMA = {
     name: { type: "string", description: "Nom du produit, 2 à 120 caractères" },
     description: { type: "string", description: "Description commerciale en français" },
     category_ref: { type: "string", description: "Code d'une catégorie existante (ex. C3), ou chaîne vide" },
-    new_category: { type: "string", description: "Nom d'une nouvelle catégorie si aucune ne convient, sinon chaîne vide" },
+    new_category: { type: "string", description: "Nom d'une nouvelle catégorie (famille spécifique ou aucune ne convient), sinon chaîne vide" },
+    fallback_ref: { type: "string", description: "Avec new_category : code de la catégorie large existante qui pourrait aussi l'accueillir, sinon chaîne vide" },
   },
-  required: ["name", "description", "category_ref", "new_category"],
+  required: ["name", "description", "category_ref", "new_category", "fallback_ref"],
   additionalProperties: false,
 } as const;
 
@@ -104,6 +119,7 @@ const outputSchema = z.object({
   // Facultatifs à la lecture : une réponse sans catégorie reste utilisable (nom + description).
   category_ref: z.string().trim().max(20).catch("").default(""),
   new_category: z.string().trim().max(200).catch("").default(""),
+  fallback_ref: z.string().trim().max(20).catch("").default(""),
 });
 
 export type ProductTextOutput = z.infer<typeof outputSchema>;
@@ -111,17 +127,28 @@ export type ProductTextSuggestion = { name: string; description: string; categor
 
 /**
  * Catégorie de la réponse de l'IA → catégorie vérifiée :
- * code valide → catégorie existante ; sinon nouveau nom, rapproché d'une catégorie existante équivalente
- * (accents, pluriel, mots génériques, synonymes simples) pour ne JAMAIS créer de doublon ; sinon null.
+ * - code valide → catégorie existante ;
+ * - sinon nouveau nom, rapproché d'une catégorie existante équivalente (accents, pluriel, mots génériques,
+ *   familles « Vis » = « Visserie », énumérations « Colles » ⊂ « Colles et adhésifs ») pour ne JAMAIS créer
+ *   de doublon ; s'il est vraiment nouveau, avec la catégorie large existante proposée en alternative ;
+ * - sinon null (choix manuel).
  */
-export function resolveCategory(output: Pick<ProductTextOutput, "category_ref" | "new_category">, categories: readonly CategoryOption[]): CategorySuggestion | null {
-  const ref = /^C(\d+)$/i.exec(output.category_ref.trim());
-  const chosen = ref ? categories[Number(ref[1]) - 1] : undefined;
+export function resolveCategory(
+  output: Pick<ProductTextOutput, "category_ref" | "new_category"> & Partial<Pick<ProductTextOutput, "fallback_ref">>,
+  categories: readonly CategoryOption[],
+): CategorySuggestion | null {
+  const byRef = (value: string | undefined) => {
+    const ref = /^C(\d+)$/i.exec((value ?? "").trim());
+    return ref ? categories[Number(ref[1]) - 1] : undefined;
+  };
+  const chosen = byRef(output.category_ref);
   if (chosen) return { kind: "existing", id: chosen.id, name: chosen.name };
   const name = cleanCategoryName(output.new_category);
   if (!name) return null;
   const similar = findSimilarCategory(name, categories);
-  return similar ? { kind: "existing", id: similar.id, name: similar.name } : { kind: "new", name };
+  if (similar) return { kind: "existing", id: similar.id, name: similar.name };
+  const fallback = byRef(output.fallback_ref);
+  return { kind: "new", name, alternative: fallback ? { id: fallback.id, name: fallback.name } : null };
 }
 
 /** Texte JSON renvoyé par l'IA → réponse validée, ou null si inutilisable. */

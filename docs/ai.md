@@ -93,17 +93,25 @@ Modèle de détourage : `npm run ai:model` une fois par machine **et sur le serv
 ## Catégorie automatique
 
 Lors de l'analyse de la photo (« Générer avec l'IA »), l'IA reçoit la **liste complète** des catégories
-(codes C1, C2…, masquées comprises) et répond `category_ref` (catégorie existante) **ou** `new_category`
-(seulement si aucune ne convient réellement, nom court en français, famille générale).
+(codes C1, C2…, masquées comprises) et applique la première règle qui s'applique :
+1. une catégorie existante est **dédiée** à la famille du produit (synonymes compris) → `category_ref` ;
+2. seule une catégorie **large** pourrait l'accueillir (« Quincaillerie », « Outillage »…) ET le produit appartient
+   à une **famille distincte et utile** au catalogue (vis → « Visserie », cadenas → « Cadenas et serrures ») →
+   `new_category` + la catégorie large en `fallback_ref` (proposée en alternative au magasin) ;
+3. une catégorie convient et le produit n'a pas de famille distincte (article isolé) → `category_ref` ;
+4. aucune ne convient → `new_category`.
 
-Garde-fou serveur (`src/lib/category-match.ts`, testé) : un nouveau nom équivalent à une catégorie existante
-(accents, majuscules, pluriel, petits mots, mots génériques « produits / matériel… », variantes simples
-« outils = outillage », « jardin = jardinage », ou même adresse) est **rattaché à l'existante** — pas de doublon.
+Garde-fou serveur (`src/lib/category-match.ts`, testé) : un nouveau nom équivalent à une catégorie existante est
+**rattaché à l'existante** — pas de doublon. Équivalent = mêmes mots aux accents / majuscules / pluriel / petits
+mots / mots génériques près, variantes de famille (« Vis » = « Visserie », « Boulons » = « Boulonnerie »,
+« Ampoules » = « Éclairage », « Adhésifs » = « Colles »), même adresse, ou énumération (« Colles » ⊂ « Colles et
+adhésifs », « Chevilles » ⊂ « Chevilles & fixations »). Une catégorie plus précise n'est pas un doublon
+(« Outillage à main » ≠ « Outillage », « Peinture » ≠ « Accessoires de peinture »).
 
 Formulaire « Nouveau produit » :
 - catégorie existante → sélectionnée, mention « Catégorie choisie par l'IA » ;
 - nouvelle → option « Nom (nouvelle) » sélectionnée, mention « Nouvelle catégorie proposée par l'IA… créée
-  automatiquement à l'enregistrement » ;
+  automatiquement à l'enregistrement » et, pour une famille spécifique, bouton « Classer plutôt dans « Quincaillerie » » ;
 - une catégorie déjà choisie par l'admin avant la génération n'est jamais remplacée ;
 - modifiable avant (menu) et après l'enregistrement (fiche).
 

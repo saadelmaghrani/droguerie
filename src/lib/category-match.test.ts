@@ -46,7 +46,7 @@ describe("findSimilarCategory", () => {
   ])("« %s » → « %s »", (proposed, expected) => {
     expect(findSimilarCategory(proposed, existing)?.name).toBe(expected);
   });
-  it.each(["Plomberie", "Colles et adhésifs", "Accessoires de peinture", "Électricité", "Outillage de jardin"])(
+  it.each(["Plomberie", "Colles et adhésifs", "Accessoires de peinture", "Électricité", "Outillage de jardin", "Visserie"])(
     "« %s » → aucune (catégorie réellement différente)",
     (proposed) => {
       expect(findSimilarCategory(proposed, existing)).toBeNull();
@@ -78,5 +78,37 @@ describe("uniqueCategorySlug", () => {
     expect(uniqueCategorySlug("Colles et adhésifs", new Set())).toBe("colles-et-adhesifs");
     expect(uniqueCategorySlug("Plomberie", new Set(["plomberie", "plomberie-2"]))).toBe("plomberie-3");
     expect(uniqueCategorySlug("!!!", new Set())).toBe("categorie");
+  });
+});
+
+describe("familles et énumérations (pas de doublon « Vis » / « Visserie »)", () => {
+  const families = [
+    { name: "Visserie", slug: "visserie" },
+    { name: "Colles et adhésifs", slug: "colles-et-adhesifs" },
+    { name: "Chevilles & fixations", slug: "chevilles-fixations" },
+    { name: "Éclairage", slug: "eclairage" },
+    { name: "Outillage", slug: "outillage" },
+    { name: "Accessoires de peinture", slug: "accessoires-de-peinture" },
+  ];
+  it.each([
+    ["Vis", "Visserie"],
+    ["vis", "Visserie"],
+    ["Boulonnerie et visserie", "Visserie"],
+    ["Colles", "Colles et adhésifs"],
+    ["Adhésifs", "Colles et adhésifs"],
+    ["Chevilles", "Chevilles & fixations"],
+    ["Ampoules", "Éclairage"],
+    ["Luminaires", "Éclairage"],
+  ])("« %s » → « %s » (existe déjà)", (proposed, expected) => {
+    expect(findSimilarCategory(proposed, families)?.name).toBe(expected);
+  });
+  it.each(["Outillage à main", "Peinture", "Plomberie", "Boulonnerie", "Fixations murales"])(
+    "« %s » → nouvelle (plus précise ou différente, pas un doublon)",
+    (proposed) => {
+      expect(findSimilarCategory(proposed, families)).toBeNull();
+    },
+  );
+  it("sans « Visserie », « Vis » n'est pas rattachée à « Quincaillerie »", () => {
+    expect(findSimilarCategory("Vis", existing)).toBeNull();
   });
 });

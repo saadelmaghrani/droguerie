@@ -433,7 +433,15 @@ export function ProductForm({
                   </SelectContent>
                 </Select>
                 <FieldError id="p-categoryId-error" message={errorOf("categoryId")} />
-                <CategoryAiNote suggestion={aiCategory} selected={newCategoryName ? "new" : aiCategory?.kind === "existing" && values.categoryId === aiCategory.id ? "existing" : null} />
+                <CategoryAiNote
+                  suggestion={aiCategory}
+                  selected={newCategoryName ? "new" : aiCategory?.kind === "existing" && values.categoryId === aiCategory.id ? "existing" : null}
+                  disabled={pending}
+                  onUseAlternative={(id) => {
+                    setUseNewCategory(false);
+                    set("categoryId", id);
+                  }}
+                />
                 {categories.length === 0 && !newCategoryName && (
                   <p className="text-sm text-amber-700">
                     Aucune catégorie : <Link href="/admin/categories" className="underline">créez-en une d&apos;abord</Link>.
@@ -548,22 +556,53 @@ function DeleteProduct({ id, name }: { id: string; name: string }) {
   );
 }
 
-/** Indique clairement que la catégorie affichée a été choisie, ou sera créée, par l'IA. */
-function CategoryAiNote({ suggestion, selected }: { suggestion: CategorySuggestion | null; selected: "new" | "existing" | null }) {
+/**
+ * Indique clairement que la catégorie affichée a été choisie, ou sera créée, par l'IA. Pour une nouvelle
+ * catégorie spécifique (ex. « Visserie »), propose en un clic la catégorie large existante (ex. « Quincaillerie »).
+ */
+function CategoryAiNote({
+  suggestion,
+  selected,
+  disabled,
+  onUseAlternative,
+}: {
+  suggestion: CategorySuggestion | null;
+  selected: "new" | "existing" | null;
+  disabled: boolean;
+  onUseAlternative: (categoryId: string) => void;
+}) {
   if (!suggestion || !selected) return null;
+  const alternative = suggestion.kind === "new" ? suggestion.alternative : null;
   return (
-    <p className="flex items-start gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-2 text-xs text-violet-900" data-testid="category-ai-note">
+    <div className="flex items-start gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-2 text-xs text-violet-900" data-testid="category-ai-note">
       <Sparkles className="mt-0.5 size-3.5 shrink-0" aria-hidden />
       {selected === "new" ? (
-        <span>
-          <strong>Nouvelle catégorie proposée par l&apos;IA</strong> : aucune catégorie existante ne correspond. Elle sera créée
-          automatiquement à l&apos;enregistrement. Vous pouvez en choisir une autre dans la liste.
-        </span>
+        <div className="grid gap-1.5">
+          <span>
+            <strong>Nouvelle catégorie proposée par l&apos;IA</strong> :{" "}
+            {alternative
+              ? "le produit appartient à une famille qui n'a pas encore sa catégorie."
+              : "aucune catégorie existante ne correspond."}{" "}
+            Elle sera créée automatiquement à l&apos;enregistrement. Vous pouvez en choisir une autre dans la liste.
+          </span>
+          {alternative && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={disabled}
+              onClick={() => onUseAlternative(alternative.id)}
+              className="h-auto justify-start bg-background py-1 text-left text-xs whitespace-normal"
+            >
+              Classer plutôt dans « {alternative.name} »
+            </Button>
+          )}
+        </div>
       ) : (
         <span>
           <strong>Catégorie choisie par l&apos;IA</strong> parmi vos catégories existantes. Vous pouvez la modifier.
         </span>
       )}
-    </p>
+    </div>
   );
 }
