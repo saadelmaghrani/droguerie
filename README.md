@@ -42,6 +42,7 @@ Espace administrateur : http://localhost:3000/admin (identifiants : `ADMIN_EMAIL
 | `npm run db:up` / `db:down` | Démarrer / arrêter PostgreSQL |
 | `npm run db:migrate -- --name <nom>` | Nouvelle migration après modification du schéma |
 | `npm run db:seed` | Données initiales (relançable sans doublons) |
+| `npm run admin:reset-password` | **Secours** : mot de passe admin oublié (voir `docs/authentication.md`) |
 | `npm run db:studio` | Explorer la base dans le navigateur |
 | `npm run import:demo -- <fichier.json>` | Produits de **démonstration** (dév. uniquement) : catégories, photo principale, sans doublon (voir `scripts/import-demo-products.ts`) |
 | `npm run ai:model` | Télécharge le modèle de détourage (IA, fond blanc), empreinte vérifiée |
@@ -49,7 +50,10 @@ Espace administrateur : http://localhost:3000/admin (identifiants : `ADMIN_EMAIL
 ## Dépannage
 
 **La page se recharge en boucle en développement** (`npm run dev`) : le cache de compilation
-Turbopack (`.next/`) est dans un état incohérent. Arrêter le serveur avec `Ctrl + C`, puis :
+Turbopack (`.next/`) est dans un état incohérent. Cause identifiée (Next 16.4.6) : relancer `next dev` avec
+d'autres variables d'environnement (ex. base de test) sur le cache disque de la session précédente. Le cache disque
+de développement est donc désactivé (`turbopackFileSystemCacheForDev: false` dans `next.config.ts`).
+Si la boucle revient malgré tout, arrêter le serveur avec `Ctrl + C`, puis :
 
 ```bash
 npm run clean
