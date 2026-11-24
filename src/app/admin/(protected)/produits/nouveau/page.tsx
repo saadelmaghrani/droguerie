@@ -5,14 +5,15 @@ import { isAiConfigured, isAiFeatureEnabled } from "@/server/ai/client";
 import { requireAdmin } from "@/server/auth/dal";
 import { listCategoryOptions } from "@/server/products/service";
 import { PageHeader } from "../../_components/page-header";
-import { ProductForm } from "../_components/product-form";
+import { NewProductForm } from "../_components/new-product-form";
 
 export const metadata: Metadata = { title: "Nouveau produit" };
 
 async function NewProductContent() {
   await requireAdmin();
   const categories = await listCategoryOptions();
-  return <ProductForm product={null} categories={categories} aiEnabled={isAiFeatureEnabled()} aiConfigured={isAiConfigured()} />;
+  // Toujours un formulaire vierge (voir new-product-form.tsx) ; l'édition utilise ProductForm directement.
+  return <NewProductForm categories={categories} aiEnabled={isAiFeatureEnabled()} aiConfigured={isAiConfigured()} />;
 }
 
 export default function NewProductPage() {

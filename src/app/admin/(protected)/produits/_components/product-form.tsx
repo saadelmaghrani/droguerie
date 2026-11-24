@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useActionState, useEffect, useState, useTransition } from "react";
+import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { ArrowLeft, CircleAlert, Eye, Loader2, Sparkles, Star, Trash2, TriangleAlert } from "lucide-react";
 import {
@@ -55,12 +55,15 @@ export function ProductForm({
   categories,
   aiEnabled = false,
   aiConfigured = false,
+  onCreated,
 }: {
   product: EditableProduct | null;
   categories: CategoryOption[];
   /** IA activée (AI_ENABLED) : affiche « Générer avec l'IA » sur la page Nouveau produit. */
   aiEnabled?: boolean;
   aiConfigured?: boolean;
+  /** Création terminée (photos envoyées), juste avant d'ouvrir la fiche : voir new-product-form.tsx. */
+  onCreated?: () => void;
 }) {
   const router = useRouter();
   const [state, formAction, pending] = useActionState<ProductFormState, FormData>(saveProduct, undefined);
@@ -94,8 +97,12 @@ export function ProductForm({
   const [slugEdited, setSlugEdited] = useState(Boolean(product));
   const set = <K extends keyof ProductFormValues>(key: K, value: ProductFormValues[K]) => setValues((v) => ({ ...v, [key]: value }));
 
+  // Résultat d'enregistrement déjà traité : quand Next.js ré-affiche une page cachée (<Activity>), les effets
+  // sont rejoués ; sans ce garde, un ancien résultat relançait l'envoi des photos et les messages.
+  const handledSubmission = useRef<number | null>(null);
   useEffect(() => {
-    if (!state) return;
+    if (!state || handledSubmission.current === state.submissionId) return;
+    handledSubmission.current = state.submissionId;
     if (!state.ok) {
       toast.error(state.message);
       return;
@@ -140,7 +147,10 @@ export function ProductForm({
           toast.warning("Produit enregistré en brouillon : publiez-le depuis sa fiche.");
         }
       }
-      if (!cancelled) router.replace(`/admin/produits/${productId}`);
+      if (!cancelled) {
+        onCreated?.();
+        router.replace(`/admin/produits/${productId}`);
+      }
     })();
     return () => {
       cancelled = true;

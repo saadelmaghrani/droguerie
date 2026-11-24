@@ -107,3 +107,15 @@ Mesuré en local : 2000 lignes analysées en 0,2 s, importées en 0,8 s.
 | `src/app/admin/(protected)/produits/` | Liste, filtres, tableau, fiche (création / modification), aperçu |
 
 Photos : voir `docs/images.md`.
+
+## « Nouveau produit » démarre toujours à zéro
+
+Avec `cacheComponents`, Next.js cache une page quittée (`<Activity>`) avec son état au lieu de la détruire.
+Pour la création, `NewProductForm` (`produits/_components/new-product-form.tsx`) remonte le formulaire à neuf :
+- à chaque arrivée par un lien ou une redirection (clé `router.bfcacheId`) ;
+- dès qu'il est caché après une création réussie (même via le bouton « Précédent »).
+
+Champs, catégorie, photos choisies, proposition IA, erreurs et résultat d'enregistrement repartent de zéro.
+Une saisie non enregistrée reste retrouvée par « Précédent » du navigateur. Dans `ProductForm`, le traitement
+« après enregistrement » (envoi des photos, publication, redirection, messages) ne s'exécute qu'une fois par
+enregistrement, même si la page est ré-affichée. La fiche d'édition n'est pas concernée.
