@@ -75,4 +75,36 @@ jamais être exposée directement sans Caddy devant (sinon l'IP pourrait être f
 ## Gestion des comptes
 
 Le premier compte est créé par `npm run db:seed` à partir de `ADMIN_EMAIL` / `ADMIN_PASSWORD`.
-Le seed ne modifie jamais un compte existant.
+Le seed ne modifie jamais un compte existant : **changer `ADMIN_PASSWORD` dans `.env` après coup n'a aucun effet**.
+Ensuite, tout se fait depuis la page **Mon compte** (`/admin/compte`, menu de l'administration).
+
+| Action | Règles |
+|---|---|
+| Nom affiché | 2 à 60 caractères |
+| Mot de passe | Mot de passe actuel obligatoire ; nouveau : 12 à 256 caractères, saisi deux fois, différent de l'actuel, pas d'espace au début/à la fin, au moins 4 caractères différents |
+| Email de connexion | Mot de passe actuel obligatoire ; format vérifié, mis en minuscules, refusé s'il est déjà pris |
+| Après mot de passe ou email modifié | Les **autres** appareils sont déconnectés ; celui en cours reste connecté (la session est liée à l'identifiant du compte, pas à l'email) |
+| Mauvais mot de passe actuel | Compte comme un échec de connexion : même blocage (5 échecs / 15 min) — une session volée ne permet pas de deviner le mot de passe |
+
+Pas de confirmation par email du nouvel email : le projet n'envoie pas d'emails (pas de SMTP). D'où la vérification
+du mot de passe actuel et le message « utilisez … à la prochaine connexion ».
+
+| Fichier | Rôle |
+|---|---|
+| `src/lib/account-validation.ts` | Règles de saisie (testées) |
+| `src/server/auth/account.ts` | Vérification du mot de passe actuel, mises à jour, déconnexion des autres appareils |
+| `src/server/auth/account-actions.ts` | Actions serveur de la page (`requireAdmin()` en premier) |
+| `src/app/admin/(protected)/compte/` | Page et formulaires |
+
+### Mot de passe oublié : commande de secours
+
+Il n'y a volontairement **pas** de lien « mot de passe oublié » sur le site. Sur le serveur (accès au terminal = preuve
+d'être le propriétaire) :
+
+```bash
+npm run admin:reset-password
+```
+
+La commande liste les comptes, demande l'email puis le nouveau mot de passe (saisie masquée, deux fois, mêmes
+règles que la page). Effets : nouveau mot de passe, compte réactivé, **tous** les appareils déconnectés, blocage
+« trop de tentatives » levé. En production, à lancer dans le conteneur de l'application une fois le déploiement en place.

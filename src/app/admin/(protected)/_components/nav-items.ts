@@ -6,6 +6,7 @@ import {
   Package,
   Settings,
   Tags,
+  UserCog,
   type LucideIcon,
 } from "lucide-react";
 
@@ -22,6 +23,7 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   { href: "/admin/whatsapp", label: "WhatsApp", icon: MessageCircle },
   { href: "/admin/statistiques", label: "Statistiques", icon: ChartColumn },
   { href: "/admin/parametres", label: "Paramètres", icon: Settings },
+  { href: "/admin/compte", label: "Mon compte", icon: UserCog },
 ];
 
 /** Le tableau de bord n'est actif que sur /admin exactement ; les autres sur leurs sous-pages aussi. */

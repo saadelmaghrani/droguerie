@@ -16,6 +16,7 @@
     "db:generate": "prisma generate",
     "db:studio": "prisma studio",
     "db:seed": "prisma db seed",
+    "admin:reset-password": "tsx --tsconfig scripts/tsconfig.json scripts/reset-admin-password.ts",
     "ai:model": "node scripts/download-ai-model.mjs",
     "import:demo": "tsx --tsconfig scripts/tsconfig.json scripts/import-demo-products.ts"
   },

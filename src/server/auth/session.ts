@@ -91,3 +91,15 @@ export async function deleteExpiredSessions(adminUserId: string): Promise<void> 
     where: { adminUserId, expiresAt: { lt: new Date() } },
   });
 }
+
+/**
+ * Supprime toutes les sessions d'un admin SAUF celle du jeton donné (null = toutes).
+ * Appelé après un changement de mot de passe ou d'email : les autres appareils sont déconnectés.
+ */
+export async function deleteOtherSessions(adminUserId: string, keepToken: string | null): Promise<number> {
+  const keepId = keepToken && keepToken.length <= MAX_TOKEN_LENGTH ? hashSessionToken(keepToken) : null;
+  const { count } = await prisma.adminSession.deleteMany({
+    where: { adminUserId, ...(keepId ? { id: { not: keepId } } : {}) },
+  });
+  return count;
+}
